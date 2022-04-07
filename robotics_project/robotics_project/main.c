@@ -10,6 +10,8 @@
 #include <chprintf.h>
 #include <motors.h>
 #include <audio/microphone.h>
+#include <sensors/VL53L0X/VL53L0X.h>
+#include <sensors/proximity.h>
 
 #include <audio_processing.h>
 #include <fft.h>
@@ -65,7 +67,12 @@ int main(void)
     timer12_start();
     //inits the motors
     motors_init();
+    //inits the proximity sensors
+    //proximity_start();
+    // calibrate the proximity sensors
+    //calibrate_ir();
 
+#if 0
     //temp tab used to store values in complex_float format
     //needed bx doFFT_c
     static complex_float temp_tab[FFT_SIZE];
@@ -163,6 +170,20 @@ int main(void)
 
         }
 #endif  /* SEND_FROM_MIC */
+    }
+#endif
+
+    int prox_values[8] = {0};
+
+    /* Infinite loop. */
+    while (1) {
+
+    	/*for (uint8_t prox_sensor_number = 0; prox_sensor_number < 8; ++prox_sensor_number) {
+    		prox_values[prox_sensor_number] = get_calibrated_prox(prox_sensor_number);
+    	}
+
+    	chprintf((BaseSequentialStream *) &SDU1, "Prox value 0 = %d", prox_values[0]);*/
+    	chThdSleepMilliseconds(100);
     }
 }
 
