@@ -32,7 +32,7 @@ static THD_FUNCTION(CaptureImage, arg) {
 	}
 }
 
-static THD_WORKING_AREA(waProcessImage, 18000);
+static THD_WORKING_AREA(waProcessImage, 1024);
 static THD_FUNCTION(ProcessImage, arg) {
 
 	chRegSetThreadName(__FUNCTION__);
