@@ -12,6 +12,7 @@ extern "C" {
 #define SUBSAMPLING 4
 #define IMAGE_WIDTH 640 // Needs to be a multiple of SUBSAMPLING
 #define IMAGE_HEIGHT 120 // Needs to be a multiple of SUBSAMPLING
+#define TOTAL_IMAGE_HEIGHT 480
 #define BYTES_PER_PIXEL 2
 #define IMAGE_BUFFER_SIZE ((IMAGE_WIDTH / SUBSAMPLING) * (IMAGE_HEIGHT / SUBSAMPLING) * BYTES_PER_PIXEL)
 #define MAX_IMAGE_BUFFER_SIZE (MAX_BUFF_SIZE / 2) // Account for double buffering

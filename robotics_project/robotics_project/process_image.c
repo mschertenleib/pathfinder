@@ -19,29 +19,37 @@ static THD_FUNCTION(CaptureImage, arg) {
 
 	po8030_advanced_config(FORMAT_RGB565, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT,
 			SUBSAMPLING_X4, SUBSAMPLING_X4);
-	dcmi_enable_double_buffering(); // TODO: do we actually need double buffering ?
+	dcmi_enable_double_buffering();
 	dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
 	dcmi_prepare();
 
 	while (1) {
-		//starts a capture
-		dcmi_capture_start();
-		//waits for the capture to be done
-		wait_image_ready();
-		//signals an image has been captured
-		chBSemSignal(&image_ready_sem);
+		/*for (uint16_t y = 0; y < TOTAL_IMAGE_HEIGHT; y += IMAGE_HEIGHT) {
+
+			po8030_advanced_config(FORMAT_RGB565, 0, y, IMAGE_WIDTH,
+			IMAGE_HEIGHT, SUBSAMPLING_X4, SUBSAMPLING_X4);
+			dcmi_enable_double_buffering();
+			dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
+			dcmi_prepare();*/
+
+			//starts a capture
+			dcmi_capture_start();
+			//waits for the capture to be done
+			wait_image_ready();
+			//signals an image has been captured
+			chBSemSignal(&image_ready_sem);
+		//}
 	}
 }
 
-//static THD_WORKING_AREA(waProcessImage, 1024);
-static THD_WORKING_AREA(waProcessImage, IMAGE_BUFFER_SIZE + 1024);
+static THD_WORKING_AREA(waProcessImage, 1024);
 static THD_FUNCTION(ProcessImage, arg) {
 
 	chRegSetThreadName(__FUNCTION__);
 	(void) arg;
 
 	uint8_t *img_buff_ptr = NULL;
-	uint8_t image[IMAGE_BUFFER_SIZE] = { 0 };
+	//uint8_t image[IMAGE_BUFFER_SIZE] = { 0 };
 
 	uint8_t current_loop = 0;
 
@@ -53,23 +61,10 @@ static THD_FUNCTION(ProcessImage, arg) {
 		// Get the pointer to the array filled with the last image in RGB565
 		img_buff_ptr = dcmi_get_last_image_ptr();
 
-		/*for (uint16_t i = 0; i < IMAGE_BUFFER_SIZE; ++i) {
-		 // Extract red component
-		 image[i] = (uint8_t) ((img_buff_ptr[2 * i] & (uint8_t) 0b11111000)
-		 >> 3);
-		 }*/
-
-		/*
-		 * Since we are reading the full 16 bits (5:6:5) of the pixel,
-		 * and we know our buffer is smaller than the buffer(s) allocated by the dcmi,
-		 * it should be safe to use memcpy
-		 */
-		memcpy(image, img_buff_ptr, IMAGE_BUFFER_SIZE);
-
 		if (current_loop == 0) {
-			SendUint8ToComputer(image, IMAGE_BUFFER_SIZE);
+			chSequentialStreamWrite((BaseSequentialStream * )&SD3, img_buff_ptr, IMAGE_BUFFER_SIZE);
 		}
-		current_loop = (current_loop + 1) % 4;
+		current_loop = (current_loop + 1) % 32;
 	}
 }
 

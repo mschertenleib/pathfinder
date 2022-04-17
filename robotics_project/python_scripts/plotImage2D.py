@@ -31,25 +31,22 @@ def handle_close(evt):
 
 # update the plots
 def update_plot():
-    if (reader_thd.need_to_update_plot()):
+    if reader_thd.need_to_update_plot():
         fig.canvas.draw_idle()
         reader_thd.plot_updated()
 
 
 # function used to update the plot of the cam data
 def update_cam_plot(port):
-    cam_data = readUint8Serial(port)
+    cam_data = read_uint8_serial(port)
 
-    if (len(cam_data) > 0):
-        cam_plot.set_ydata(cam_data)
-
-        graph_cam.relim()
-        graph_cam.autoscale()
+    if len(cam_data) > 0:
+        plt.imshow(cam_data)
 
         reader_thd.tell_to_update_plot()
 
 
-def RGB565_to_RGB(rgb565):
+def rgb565_to_rgb(rgb565):
     r = (rgb565 & 0b1111_1000_0000_0000) >> 11
     g = (rgb565 & 0b0000_0111_1110_0000) >> 5
     b = (rgb565 & 0b0000_0000_0001_1111)
@@ -57,48 +54,48 @@ def RGB565_to_RGB(rgb565):
 
 
 # reads the data in uint8 from the serial
-def readUint8Serial(port):
+def read_uint8_serial(port):
     state = 0
 
-    while (state != 5):
+    while state != 5:
 
         # reads 1 byte
         c1 = port.read(1)
         # timeout condition
-        if (c1 == b''):
+        if c1 == b'':
             print('Timeout...')
-            return [];
+            return []
 
-        if (state == 0):
-            if (c1 == b'S'):
+        if state == 0:
+            if c1 == b'S':
                 state = 1
             else:
                 state = 0
-        elif (state == 1):
-            if (c1 == b'T'):
+        elif state == 1:
+            if c1 == b'T':
                 state = 2
-            elif (c1 == b'S'):
+            elif c1 == b'S':
                 state = 1
             else:
                 state = 0
-        elif (state == 2):
-            if (c1 == b'A'):
+        elif state == 2:
+            if c1 == b'A':
                 state = 3
-            elif (c1 == b'S'):
+            elif c1 == b'S':
                 state = 1
             else:
                 state = 0
-        elif (state == 3):
-            if (c1 == b'R'):
+        elif state == 3:
+            if c1 == b'R':
                 state = 4
-            elif (c1 == b'S'):
+            elif c1 == b'S':
                 state = 1
             else:
                 state = 0
-        elif (state == 4):
-            if (c1 == b'T'):
+        elif state == 4:
+            if c1 == b'T':
                 state = 5
-            elif (c1 == b'S'):
+            elif c1 == b'S':
                 state = 1
             else:
                 state = 0
@@ -111,15 +108,15 @@ def readUint8Serial(port):
 
     # reads the data
     rcv_buffer = port.read(size)
-    data = []
+    data = []  # TODO: it might be way faster to preallocate
 
     # if we receive the good amount of data, we convert them in float32
-    if (len(rcv_buffer) == size):
+    if len(rcv_buffer) == size:
         i = 0
-        while (i < size):
+        while i < size:
             rgb565 = struct.unpack_from('<h', rcv_buffer, i)
-
-            data.append(rgb565)
+            rgb = rgb565_to_rgb(rgb565)
+            data.append(rgb)
             i = i + 2
 
         print('Received !')
@@ -130,7 +127,7 @@ def readUint8Serial(port):
 
 
 # thread used to control the communication part
-class serial_thread(Thread):
+class SerialThread(Thread):
 
     # init function called when the thread begins
     def __init__(self, port):
@@ -150,9 +147,9 @@ class serial_thread(Thread):
     # function called after the init
     def run(self):
 
-        while (self.alive):
+        while self.alive:
 
-            if (self.contReceive):
+            if self.contReceive:
                 update_cam_plot(self.port)
             else:
                 # flush the serial
@@ -160,7 +157,7 @@ class serial_thread(Thread):
                 time.sleep(0.1)
 
     # enables the continuous reading
-    def setContReceive(self, val):
+    def set_cont_receive(self, val):
         self.contReceive = True
 
     # disables the continuous reading
@@ -183,8 +180,8 @@ class serial_thread(Thread):
     def stop(self):
         self.alive = False
         self.join()
-        if (self.port.isOpen()):
-            while (self.port.inWaiting() > 0):
+        if self.port.isOpen():
+            while self.port.inWaiting() > 0:
                 self.port.read(self.port.inWaiting())
                 time.sleep(0.01)
             self.port.close()
@@ -197,7 +194,7 @@ if len(sys.argv) == 1:
 
 # serial reader thread config
 # begins the serial thread
-reader_thd = serial_thread(sys.argv[1])
+reader_thd = SerialThread(sys.argv[1])
 reader_thd.start()
 
 # figure config
@@ -205,12 +202,6 @@ fig, ax = plt.subplots(num=None, figsize=(10, 8), dpi=80)
 fig.canvas.set_window_title('CamReg plot')
 plt.subplots_adjust(left=0.1, bottom=0.25)
 fig.canvas.mpl_connect('close_event', handle_close)  # to detect when the window is closed and if we do a ctrl-c
-
-# cam graph config with initial plot
-graph_cam = plt.subplot(111)
-graph_cam.set_ylim([0, max_value])
-cam_plot, = plt.plot(np.arange(0, n, 1), np.linspace(max_value, max_value, n), lw=1, color='red')
-plt.ylabel("camera line")
 
 # timer to update the plot from within the state machine of matplotlib
 # because matplotlib is not thread safe...
@@ -228,7 +219,7 @@ receiveButton = Button(receiveAx, 'Start reading', color=colorAx, hovercolor='0.
 stop = Button(stopAx, 'Stop reading', color=colorAx, hovercolor='0.975')
 
 # callback config of the buttons, sliders and radio buttons
-receiveButton.on_clicked(reader_thd.setContReceive)
+receiveButton.on_clicked(reader_thd.set_cont_receive)
 stop.on_clicked(reader_thd.stop_reading)
 
 # starts the matplotlib main
