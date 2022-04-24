@@ -58,27 +58,26 @@ int main(void) {
 	chSysInit();
 	mpu_init();
 
-	//inits the messagebus
+	// Init the messagebus
 	messagebus_init(&bus, &bus_lock, &bus_condvar);
 
-	//starts the serial communication
+	// Start the serial communication
 	serial_start();
-	//starts the USB communication
+	// Start the USB communication
 	usb_start();
-	//starts timer 12
+	// Start timer 12
 	//timer12_start();
-	//inits the motors
+	// Init the motors
 	//motors_init();
-	//starts the camera
+	// Start the camera
 	dcmi_start();
 	po8030_start();
 	process_image_start();
-	//inits the proximity sensors
+	// Init the proximity sensors
 	proximity_start();
-	//calibrates the proximity sensors
+	// Calibrate the proximity sensors
 	calibrate_ir();
-
-	//inits the TOF sensor
+	// Init the TOF sensor
 	VL53L0X_start();
 
 	/* Infinite loop. */
