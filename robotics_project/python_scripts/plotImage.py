@@ -139,10 +139,10 @@ def readUint8Serial(port):
             data.append(struct.unpack_from('<B',rcv_buffer, i))
             i = i+1
 
-        print('received !')
+        print('Received !')
         return data
     else:
-        print('Timout...')
+        print('Timeout...')
         return []
 
 #thread used to control the communication part

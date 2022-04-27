@@ -11,16 +11,13 @@ GLOBAL_PATH = ../../lib/e-puck2_main-processor
 #Source files to include
 CSRC += ./main.c \
 		./communications.c \
+		./process_image.c
 
 #Header folders to include
 INCDIR += 
 
-# Debugging options
-USE_OPT = -O0 -g -ggdb -fomit-frame-pointer -falign-functions=16 -fno-strict-aliasing -fstack-protector-all -L .
-
-# Warnings
-USE_COPT = -Wfatal-errors -Wall -Wextra -Wshadow -Wunused -Wnull-dereference -Wdouble-promotion \
--Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op
+# Compiler options
+#USE_OPT = -O3 -ggdb -fomit-frame-pointer -falign-functions=16 -fno-strict-aliasing -fstack-protector-all -L .
 
 #Jump to the main Makefile
 include $(GLOBAL_PATH)/Makefile
