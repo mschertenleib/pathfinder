@@ -53,10 +53,10 @@ static THD_FUNCTION(ProcessImage, arg) {
 
 		if (current_loop == 0) {
 			// Send the binary data to the PC
-			chSequentialStreamWrite((BaseSequentialStream * )&SD3, img_buff_ptr,
-					IMAGE_BUFFER_SIZE);
+			SendUint8ToComputer(img_buff_ptr, IMAGE_BUFFER_SIZE);
+			//chSequentialStreamWrite((BaseSequentialStream * )&SD3, img_buff_ptr, IMAGE_BUFFER_SIZE);
 		}
-		current_loop = (current_loop + 1) % 32;
+		current_loop = (current_loop + 1) % 16;
 	}
 }
 

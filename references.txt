@@ -1,5 +1,7 @@
-monocular visual SLAM:
+Visual SLAM:
 	https://ch.mathworks.com/help/vision/ug/monocular-visual-simultaneous-localization-and-mapping.html#MonocularVisualSimultaneousLocalizationAndMappingExample-3
+	https://pythonrepo.com/repo/raulmur-ORB_SLAM2-python-deep-learning
+	https://github.com/luigifreda/pyslam
 
 Visibility graphs:
 	https://en.wikipedia.org/wiki/Visibility_graph

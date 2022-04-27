@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -8,9 +9,10 @@
 
 int main(int argc, char *argv[])
 {
-    if (argc != 4)
+    if (!(argc == 4 || argc == 5))
     {
-        std::cerr << "Usage: " << argv[0] << " <filename> <width> <height>\n";
+        std::cerr << "Usage: " << argv[0]
+                  << " <filename> <width> <height> [--header]\n";
         return EXIT_FAILURE;
     }
 
@@ -20,6 +22,17 @@ int main(int argc, char *argv[])
     const auto num_pixels = width * height;
     const auto buffer_size = num_pixels * 2;
 
+    bool has_header {false};
+    if (argc == 5)
+    {
+        if (std::strcmp(argv[4], "--header") == 0)
+        {
+            has_header = true;
+        }
+    }
+
+    const auto expected_file_size = has_header ? buffer_size + 7 : buffer_size;
+
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open())
     {
@@ -27,13 +40,18 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     const auto file_size = std::filesystem::file_size(filename);
-    if (file_size != buffer_size)
+    if (file_size != expected_file_size)
     {
-        std::cerr << "Unexpected file size\n";
+        std::cerr << "Unexpected file size of " << file_size << " bytes, expected "
+                  << expected_file_size << " bytes\n";
         return EXIT_FAILURE;
     }
 
     std::vector<char> buffer(buffer_size);
+    if (has_header)
+    {
+        file.seekg(7);
+    }
     file.read(buffer.data(), buffer_size);
     file.close();
 

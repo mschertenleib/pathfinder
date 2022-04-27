@@ -12,12 +12,15 @@ extern "C" {
 #define CONCATENATE_IMPL(a, b) a ## b
 #define CONCATENATE(a, b) CONCATENATE_IMPL(a, b)
 
-#define IMAGE_X 0
-#define IMAGE_Y 0
-#define IMAGE_WIDTH 640
-#define IMAGE_HEIGHT 120
+#define TOTAL_IMAGE_WIDTH 640
+#define TOTAL_IMAGE_HEIGHT 480
+
+#define IMAGE_WIDTH 300 //640
+#define IMAGE_HEIGHT 256 //120
 #define SUBSAMPLING_VALUE 4
 
+#define IMAGE_X (TOTAL_IMAGE_WIDTH - IMAGE_WIDTH) / 2 // Capture a zone in the center of the camera
+#define IMAGE_Y (TOTAL_IMAGE_HEIGHT - IMAGE_HEIGHT) / 2 // Capture a zone in the center of the camera
 #define IMAGE_SUBSAMPLING CONCATENATE(SUBSAMPLING_X, SUBSAMPLING_VALUE)
 #define BYTES_PER_PIXEL 2
 #define IMAGE_BUFFER_SIZE ((IMAGE_WIDTH / SUBSAMPLING_VALUE) * (IMAGE_HEIGHT / SUBSAMPLING_VALUE) * BYTES_PER_PIXEL)
