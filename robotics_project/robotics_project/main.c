@@ -9,9 +9,6 @@
 #include <main.h>
 #include <chprintf.h>
 #include <motors.h>
-#include <audio/microphone.h>
-#include <sensors/VL53L0X/VL53L0X.h>
-#include <sensors/proximity.h>
 #include <communications.h>
 #include <arm_math.h>
 #include <msgbus/messagebus.h>

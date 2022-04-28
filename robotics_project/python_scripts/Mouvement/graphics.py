@@ -8,8 +8,8 @@ CM_PER_STEP = 13/1000
 
 class Epuck:
 
-    rradius = 3.0
-    wheel_space = 5.5
+    rradius = 3.65
+    wheel_space = 5.4
     cam_angle = np.pi/4
 
     def __init__(self,xpos,ypos,phi):

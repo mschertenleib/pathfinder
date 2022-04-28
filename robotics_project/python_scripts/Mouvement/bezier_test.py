@@ -17,14 +17,14 @@ original_stdout = sys.stdout
 instrfile = "SpdInstr.txt"
 
 points = [[0,0]]
-nbApprox = 9
+nbApprox = 11
 timecom = 10000
 
 RAD = 2*10000
 ESP_D = 5.5
 
 def send_instr(file,port):
-    ser = serial.Serial(port, 19200, timeout=5)
+    ser = serial.Serial(port, 57600, timeout=5)
     if(not ser.is_open):
         ser.open()
 
@@ -36,9 +36,10 @@ def send_instr(file,port):
     len = int(file.readline().rstrip("\n"))
     for i in range(len):
         for inf in file.readline().split():
+            if(inf == "END"):
+                print("finished reading",instrfile)
+                break
             command.append(int(inf))
-
-    print("sending:",instr,len,command)
 
     for c in instr :                    #send instr like "MOVE"
         ser.write(c.encode('utf-8'))
@@ -50,12 +51,14 @@ def send_instr(file,port):
     for inf in command:                 #sends data
         ser.write(struct.pack(">H",inf))
 
-    confirm = ser.read(1)
+    print("sent:",instr,len,command)
+    confirm = ser.read(1).decode("ascii")
     print(confirm)
-    if(confirm == 'o'):
+    if(confirm == 'c'):
         print(" Confirmed !")
     else:
         print(" epuck didn't listen. again. ")
+    ser.close()
     
 
 def recursive_bezier(points,t):
@@ -179,7 +182,35 @@ def onclick(event):
 
     print(strt)
     graphics.simulate(instrfile,strt)
-    
+
+def on_press(event):
+    print('press', event.key)
+    sys.stdout.flush()
+    if event.key == 'x':
+        send_instr("SpdInstr.txt","COM6")
+        listen_ser("COM6",1e6)
+
+def listen_ser(port,time):
+    print("Opening ",port," and reading :")
+    ser = serial.Serial(port, 57600, timeout=1)
+    if(not ser.is_open):
+        ser.open()
+    i = 0
+    while i < time:
+        bytesToRead = ser.inWaiting()
+        serstr = ser.read(bytesToRead)
+        if serstr != b'':
+            i= 0
+            ret = serstr.decode("ascii")
+            print("->",ret)
+            if ret.find("DONE") != -1:
+                break
+        else:
+            i += 1
+    print("stopped listening.",i)
+    ser.close()
+
+
 fig = plt.figure(figsize=(5,5),edgecolor="#000000",facecolor="#ffffff")
 
 ax = fig.add_subplot(111)
@@ -197,7 +228,7 @@ for circ in circles:
     py += circ[0][1]
     #plt.plot(px,py,color="#aaaaaa")
 
-cid = fig.canvas.mpl_connect('button_press_event', onclick)
+fig.canvas.mpl_connect('button_press_event', onclick)
+fig.canvas.mpl_connect('key_press_event', on_press)
 
 plt.show()
-send_instr("SpdInstr.txt","COM8")

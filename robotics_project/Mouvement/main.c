@@ -82,9 +82,9 @@ int main(void) {
 	/* Infinite loop. */
 	while (1) {
 
-		ReceiveSpeedInstMove((BaseSequentialStream* ) &SD3, NB_MOVES);
+		ReceiveSpeedInstMove((BaseSequentialStream* ) &SD3,(BaseSequentialStream *) &SD3, NB_MOVES);
 		
-		chprintf((BaseSequentialStream *) &SDU1,"Loop Main\r\n");
+		chprintf((BaseSequentialStream *) &SD3,"Loop Main\r\n");
 
 		chThdSleepMilliseconds(1000);
 	}

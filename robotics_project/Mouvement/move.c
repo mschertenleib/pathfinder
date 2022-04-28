@@ -22,7 +22,7 @@ static BSEMAPHORE_DECL(sequence_ready_sem, TRUE);
 *   data = [left speed 0,right speed 0, runtime 0, left speed 1, right speed 1, runtime 1, ...]
 *   command example : MOVE nbinstr instructions
 */
-void ReceiveSpeedInstMove(BaseSequentialStream* in, uint16_t size)
+void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out, uint16_t size)
 {
     volatile uint8_t l1,l2,r1,r2,t1,t2;
 	volatile uint16_t temp_size = 0;
@@ -33,7 +33,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, uint16_t size)
 		while(state != 4){
 
 			l1 = chSequentialStreamGet(in);
-			chprintf((BaseSequentialStream *) &SDU1,"ASCII %c, Hex %x, Dec %d.\r\n",l1,l1,l1);
+			chprintf(out,"ASCII %c, Hex %x, Dec %d.\r\n",l1,l1,l1);
 			//State machine to detect the string EOF\0S in order synchronize
 			//with the frame received
 			switch(state){
@@ -67,7 +67,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, uint16_t size)
 			
 		}
 
-		chprintf((BaseSequentialStream *) &SDU1,"INSTRUCTION MOVE\r\n");
+		chprintf(out,"INSTRUCTION MOVE\r\n");
 
 		l1 = chSequentialStreamGet(in);
 		l2 = chSequentialStreamGet(in);
@@ -91,13 +91,14 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, uint16_t size)
 				move_sequence[(i*3)+1] = (int16_t)((r2 | r1<<8));    // right speed
 				move_sequence[(i*3)+2] = (int16_t)((t2 | t1<<8));    // runtime
 
-				chprintf((BaseSequentialStream *) &SDU1,"load %d L %d R %d T%d \r\n",i,move_sequence[i*3],move_sequence[(i*3)+1],move_sequence[(i*3)+2]);
+				chprintf(out,"load %d L %d R %d T%d \r\n",i,move_sequence[i*3],move_sequence[(i*3)+1],move_sequence[(i*3)+2]);
 			}
-			//chSequntialStreamPut(in,'o');
+
+			chprintf(out,"M");
 			chBSemSignal(&sequence_ready_sem);
 		}
 	}else{
-		chprintf((BaseSequentialStream *) &SDU1,"cannot load sequence, main sequence being used %d \r\n",chSequentialStreamGet(in));
+		chprintf(out,"cannot load sequence, main sequence being used %d \r\n",chSequentialStreamGet(in));
 	}
 }
 
@@ -117,11 +118,12 @@ static THD_FUNCTION(moveThread,arg){
 			left_motor_set_speed(move_sequence[i*3]);
 			right_motor_set_speed(move_sequence[(i*3)+1]);
 			chThdSleepMilliseconds(move_sequence[(i*3)+2]);
-			chprintf((BaseSequentialStream *) &SDU1,"running: %d L%d R%d T%d \r\n",i,move_sequence[i*3],move_sequence[(i*3)+1],move_sequence[(i*3)+2]);
+			chprintf((BaseSequentialStream *) &SD3,"running: %d L%d R%d T%d \r\n",i,move_sequence[i*3],move_sequence[(i*3)+1],move_sequence[(i*3)+2]);
 		}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		chThdSleepMilliseconds(100);
+		chprintf((BaseSequentialStream *) &SD3,"DONE");
 		running_sequence = FALSE;
 		chBSemReset(&sequence_ready_sem,TRUE);
 	}
