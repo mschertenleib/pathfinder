@@ -13,6 +13,7 @@
 #include <arm_math.h>
 #include <msgbus/messagebus.h>
 #include <move.h>
+#include <audio/audio_thread.h>
 
 messagebus_t bus;
 MUTEX_DECL(bus_lock);
@@ -37,6 +38,24 @@ static void timer12_start(void) {
 	gptStartContinuous(&GPTD12, 0xFFFF);
 }
 
+
+static THD_WORKING_AREA(blinkThreadArea,512);
+static THD_FUNCTION(blinkThread,arg){
+
+	chRegSetThreadName(__FUNCTION__);
+	(void) arg;
+
+	while(TRUE){
+
+		chprintf((BaseSequentialStream *) &SDU1,"ping!\r\n");
+		/*dac_play(440);
+		chThdSleepMilliseconds(10);
+		dac_stop();*/
+		chThdSleepMilliseconds(1000);
+	}
+}
+
+
 int main(void) {
 
 	halInit();
@@ -51,17 +70,23 @@ int main(void) {
 	usb_start();
 	//starts timer 12
 	timer12_start();
+	//speaker thd start
+	//dac_start();
 	//inits the motors
 	motors_init();
+	//init move thread
+	lauch_move_thd();
+	//serial checksender
+	//chThdCreateStatic(blinkThreadArea,sizeof(blinkThreadArea),NORMALPRIO-1,blinkThread,NULL);
 
 	/* Infinite loop. */
 	while (1) {
 
-		ReceiveSpeedInstMove((BaseSequentialStream* ) &SDU1, NB_MOVES);
+		ReceiveSpeedInstMove((BaseSequentialStream* ) &SD3, NB_MOVES);
 		
-		RunSpeedInstSequence();
+		chprintf((BaseSequentialStream *) &SDU1,"Loop Main\r\n");
 
-		chThdSleepMilliseconds(200);
+		chThdSleepMilliseconds(1000);
 	}
 }
 
