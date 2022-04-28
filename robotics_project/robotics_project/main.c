@@ -70,8 +70,8 @@ int main(void) {
 	// Init the motors
 	//motors_init();
 	// Start the camera
-	dcmi_start();
-	po8030_start();
+	//dcmi_start();
+	//po8030_start();
 	process_image_start();
 	// Init the proximity sensors
 	proximity_start();
@@ -98,14 +98,13 @@ int main(void) {
 				prox_values[4], prox_values[5], prox_values[6], prox_values[7]);
 #endif
 
-//#define SEND_TOF_VALUE
+#define SEND_TOF_VALUE
 #ifdef SEND_TOF_VALUE
 		uint16_t dist_mm = VL53L0X_get_dist_mm();
-		chprintf((BaseSequentialStream *) &SDU1, "TOF dist. [mm]: %d\r\n",
-				dist_mm);
+		chprintf((BaseSequentialStream *) &SDU1, "TOF [mm]: %d\r\n", dist_mm);
 #endif
 
-		chThdSleepMilliseconds(200);
+		chThdSleepMilliseconds(5);
 	}
 }
 

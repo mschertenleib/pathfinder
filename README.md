@@ -5,10 +5,12 @@ The 2022 Embedded Systems and Robotics project of Gilles Regamey and Mathieu Sch
 ---
 ## References
 
-Visual SLAM:
+SLAM:
 * https://ch.mathworks.com/help/vision/ug/monocular-visual-simultaneous-localization-and-mapping.html#MonocularVisualSimultaneousLocalizationAndMappingExample-3
 * https://pythonrepo.com/repo/raulmur-ORB_SLAM2-python-deep-learning
 * https://github.com/luigifreda/pyslam
+* https://link.springer.com/content/pdf/10.1007/s13320-022-0657-6.pdf
+* https://github.com/ekorudiawan/IEPF-Line-Extraction
 
 Visibility graphs:
 * https://en.wikipedia.org/wiki/Visibility_graph
