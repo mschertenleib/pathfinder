@@ -4,18 +4,24 @@ import environment_map
 
 
 def get_robot_data(true_map: environment_map.Environment_map, tof_sensor_offset_mm):
-    num_samples = 100
+    num_samples = 1000
     arr = np.zeros((num_samples, 4))
-    robot_x_mm = true_map.width_mm / 2
-    robot_y_mm = true_map.height_mm / 2
     for i in range(num_samples):
-        angle_rad = i / num_samples * 2 * np.pi
-        start_x_mm = robot_x_mm + tof_sensor_offset_mm * np.cos(angle_rad)
-        start_y_mm = robot_y_mm + tof_sensor_offset_mm * np.sin(angle_rad)
-        exact_distance_mm = true_map.raycast(start_x_mm, start_y_mm, angle_rad)
-        distance_mm = exact_distance_mm * \
-            (1 + (np.random.rand() * 2 - 1) * 0.1)
-        arr[i] = (robot_x_mm, robot_y_mm, angle_rad, distance_mm)
+        exact_robot_angle_rad = i / 90 * 2 * np.pi
+        exact_robot_x_mm = true_map.width_mm * (0.5 + 0.1 * np.sin(exact_robot_angle_rad))
+        exact_robot_y_mm = true_map.height_mm * (0.5 - 0.1 * np.cos(exact_robot_angle_rad))
+
+        robot_angle_rad = exact_robot_angle_rad * (1 + (np.random.rand() * 2 - 1) * 0.02)
+        robot_x_mm = exact_robot_x_mm * (1 + (np.random.rand() * 2 - 1) * 0.05)
+        robot_y_mm = exact_robot_y_mm * (1 + (np.random.rand() * 2 - 1) * 0.05)
+
+        start_x_mm = exact_robot_x_mm + tof_sensor_offset_mm * np.cos(exact_robot_angle_rad)
+        start_y_mm = exact_robot_y_mm + tof_sensor_offset_mm * np.sin(exact_robot_angle_rad)
+        distance_mm = true_map.raycast(start_x_mm, start_y_mm, exact_robot_angle_rad)
+        distance_mm *= (1 + (np.random.rand() * 2 - 1) * 0.05)
+
+        arr[i] = (robot_x_mm, robot_y_mm, robot_angle_rad, distance_mm)
+
     return arr
 
 
@@ -33,8 +39,8 @@ if __name__ == '__main__':
 
     width_mm = 640
     height_mm = 480
-    cell_size_mm = 5
-    robot_radius_mm = 50
+    cell_size_mm = 10
+    robot_radius_mm = 35
     tof_sensor_offset_mm = robot_radius_mm
     robot_delta_mm = robot_radius_mm
     width_px = width_mm
@@ -89,5 +95,4 @@ if __name__ == '__main__':
         #if k == 27:  # Esc
         #    break
 
-    cv2.waitKey(0)
     cv2.destroyAllWindows()
