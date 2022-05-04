@@ -91,8 +91,8 @@ class Grid_map:
 
 class Constructed_map:
 
-    OCCUPIED_THRESHOLD = 0.3
-    FREE_THRESHOLD = 0.7
+    OCCUPIED_THRESHOLD = 0.25
+    FREE_THRESHOLD = 0.75
 
     def __init__(self, width_mm, height_mm, cell_size_mm):
         self.cell_size_mm = cell_size_mm
@@ -140,14 +140,34 @@ class Constructed_map:
 
     def walkable(self, radius_mm):
         kernel = disk_kernel(self.__val_mm_to_index(radius_mm))
-        obstacles = np.zeros((self.height, self.width))
-        obstacles[self.cells > self.FREE_THRESHOLD] = 1
+        # An obstacle is a positive value, a free cell is a 0
+        obstacles = np.ones((self.height, self.width))
+        obstacles[self.cells > self.FREE_THRESHOLD] = 0
         filtered = cv2.filter2D(src=obstacles, ddepth=-1, kernel=kernel)
-        return 1 - filtered
+        walkable_grid = 1 - np.clip(filtered, 0, 1)
+        return walkable_grid
     
     def walkable_resized(self, radius_mm, height, width):
         walkable = self.walkable(radius_mm)
         return cv2.resize(src=walkable, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
+    
+    def find_path(self, start_mm, goal_mm, robot_radius_mm):
+        start = self.__point_mm_to_index(start_mm)
+        goal = self.__point_mm_to_index(goal_mm)
+        path, runs = self.__find_path(start, goal, robot_radius_mm)
+
+        print('Operations:', runs)
+        if len(path) > 0:
+            print('Path length:', len(path))
+        else:
+            print('No path from start to goal found')
+        
+        img = np.zeros((self.height, self.width))
+        for x, y in path:
+            img[y][x] = 1
+        img = cv2.resize(src=img, dsize=(640, 480),
+                     interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('map', img)
 
     def __x_mm_is_in_grid(self, x_mm):
         return x_mm > 0 and x_mm < self.width_mm
@@ -180,15 +200,26 @@ class Constructed_map:
         radius = self.__val_mm_to_index(radius_mm)
         cv2.circle(img=self.cells, center=center, radius=radius, color=1, thickness=-1)
 
+    # FIXME: some cells sometimes directly go from 1 to 0 -> why?
+
     def __update_cells(self):
         # Required for cv2.divide to be defined when dividing by 0
-        assert self.total_samples.dtype == int # more like 'integer type'
+        assert self.total_samples.dtype == int
 
         means = cv2.divide(self.free_samples, self.total_samples)
         means[self.total_samples == 0] = 0.5
         free_probabilities = 0.5 + (means - 0.5) * (1 - np.power(0.5, self.total_samples))
         uncertain_cells = np.logical_and(self.cells > 0, self.cells < 1)
         self.cells = np.where(uncertain_cells, free_probabilities, self.cells)
+    
+    def __find_path(self, start_coords, goal_coords, robot_radius_mm):
+        walkable_cells = self.walkable(robot_radius_mm)
+        grid = Grid(matrix=walkable_cells)
+        start = grid.node(start_coords[0], start_coords[1])
+        end = grid.node(goal_coords[0], goal_coords[1])
+        finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
+        path, runs = finder.find_path(start, end, grid)
+        return path, runs
 
 def disk_kernel(radius):
     """
