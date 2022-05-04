@@ -1,59 +1,54 @@
 import numpy as np
 import cv2
-
-
-# Considerations about cell value representation:
-# - The disk filtering needs free cells to be represented by a 0
-# - The pathfinding library expects a 0 to represent an obstacle and a 1 a free cell
-# - When showing the image, it would make sense for a wall to be 0 (black)
+from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
 
 
 class Grid_map:
 
-    FREE = 0
-    WALL = 1
-
-    def __init__(self, width_mm, height_mm, cell_size_mm):
-        self.cell_size_mm = cell_size_mm
+    def __init__(self, width_mm, height_mm, width_px, height_px):
+        self.cell_size_mm = width_mm / width_px
         self.width_mm = width_mm
         self.height_mm = height_mm
-        self.width = self.__val_mm_to_index(self.width_mm)  # width in cells
-        self.height = self.__val_mm_to_index(self.height_mm)  # height in cells
-        self.walls = np.zeros((self.height, self.width))
+        self.width = width_px
+        self.height = height_px
+        self.cells = np.ones((self.height, self.width))
 
-    def point(self, x_mm, y_mm):
-        x_index = self.__val_mm_to_index(x_mm)
-        y_index = self.__val_mm_to_index(y_mm)
-        self.walls[y_index][x_index] = self.WALL
-    
-    def point_normalized(self, pt):
-        x_index = int(pt[0] * self.width)
-        y_index = int(pt[1] * self.height)
-        self.walls[y_index][x_index] = self.WALL
-
-    def line(self, pt1_mm, pt2_mm):
+    def line(self, pt1_mm, pt2_mm, thickness=1):
         pt1_index = self.__point_mm_to_index(pt1_mm)
         pt2_index = self.__point_mm_to_index(pt2_mm)
-        cv2.line(self.walls, pt1_index, pt2_index, self.WALL)
+        cv2.line(self.walls, pt1_index, pt2_index, 0, thickness)
     
-    def line_normalized(self, pt1, pt2):
+    def line_normalized(self, pt1, pt2, thickness=1):
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
         pt2_index = (int(pt2[0] * self.width_mm), int(pt2[1] * self.height_mm))
-        cv2.line(self.walls, pt1_index, pt2_index, self.WALL)
+        cv2.line(self.cells, pt1_index, pt2_index, 0, thickness)
+    
+    def rectangle(self, pt1_mm, pt2_mm, thickness=1):
+        pt1_index = self.__point_mm_to_index(pt1_mm)
+        pt2_index = self.__point_mm_to_index(pt2_mm)
+        cv2.rectangle(self.walls, pt1_index, pt2_index, 0, thickness)
+    
+    def rectangle_normalized(self, pt1, pt2, thickness=1):
+        pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
+        pt2_index = (int(pt2[0] * self.width_mm), int(pt2[1] * self.height_mm))
+        cv2.rectangle(self.cells, pt1_index, pt2_index, 0, thickness)
 
-    def disk(self, center_mm, radius_mm):
+    def circle(self, center_mm, radius_mm, thickness=1):
         center = self.__point_mm_to_index(center_mm)
         radius = self.__val_mm_to_index(radius_mm)
-        cv2.circle(img=self.walls, center=center,
-                   radius=radius, color=self.WALL_VALUE, thickness=-1)
+        cv2.circle(self.cells, center, radius, 0, thickness)
 
-    def to_image(self, height, width):
-        return cv2.resize(src=self.walls, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
+    def to_image(self):
+        return self.cells
 
     def walkable(self, radius_mm):
         kernel = disk_kernel(self.__val_mm_to_index(radius_mm))
-        filtered = cv2.filter2D(src=self.walls, ddepth=-1, kernel=kernel)
-        return filtered
+        # This method requires a free cell to be 0
+        inverted_cells = 1 - self.cells
+        filtered = cv2.filter2D(src=inverted_cells, ddepth=-1, kernel=kernel)
+        return 1 - filtered
 
     def raycast(self, start_pos_mm, angle_rad, default_distance_mm):
         """
@@ -70,7 +65,7 @@ class Grid_map:
         while self.__point_mm_is_in_grid((x_mm, y_mm)):
             x_index = self.__val_mm_to_index(x_mm)
             y_index = self.__val_mm_to_index(y_mm)
-            if self.walls[y_index][x_index]:
+            if self.cells[y_index][x_index] == 0:
                 return np.sqrt((x_mm - start_x_mm)**2 + (y_mm - start_y_mm)**2)
             x_mm += delta_mm * np.cos(angle_rad)
             y_mm += delta_mm * np.sin(angle_rad)
@@ -96,10 +91,8 @@ class Grid_map:
 
 class Constructed_map:
 
-    FREE_VALUE = 0
-    OCCUPIED_VALUE = 1
-    FREE_THRESHOLD = 0.3
-    OCCUPIED_THRESHOLD = 0.7
+    OCCUPIED_THRESHOLD = 0.3
+    FREE_THRESHOLD = 0.7
 
     def __init__(self, width_mm, height_mm, cell_size_mm):
         self.cell_size_mm = cell_size_mm
@@ -107,14 +100,14 @@ class Constructed_map:
         self.height_mm = height_mm
         self.width = self.__val_mm_to_index(self.width_mm)  # width in cells
         self.height = self.__val_mm_to_index(self.height_mm)  # height in cells
-        self.sums = np.ones((self.height, self.width)) * \
-            (self.FREE_VALUE + self.OCCUPIED_VALUE) / 2
-        self.samples = np.zeros((self.height, self.width))
+        self.free_samples = np.zeros((self.height, self.width), dtype=int)
+        self.total_samples = np.zeros((self.height, self.width), dtype=int)
+        self.cells = np.ones((self.height, self.width)) * 0.5
 
     def construct(self, robot_pos_mm, robot_angle_rad, robot_radius_mm, tof_distance_mm, tof_sensor_offset_mm, tof_max_distance_mm):
 
         # Free disk where the robot is located
-        self.__free_disk(center_mm=robot_pos_mm, radius_mm=robot_radius_mm)
+        self.__set_free_disk(center_mm=robot_pos_mm, radius_mm=robot_radius_mm)
 
         cos_angle = np.cos(robot_angle_rad)
         sin_angle = np.sin(robot_angle_rad)
@@ -127,43 +120,33 @@ class Constructed_map:
             obstacle_y_mm = tof_y_mm + tof_distance_mm * sin_angle
 
             # Free line of sight
-            self.__free_line((tof_x_mm, tof_y_mm),
-                             (obstacle_x_mm, obstacle_y_mm))
+            self.__sample_free_line((tof_x_mm, tof_y_mm), (obstacle_x_mm, obstacle_y_mm))
 
             if self.__point_mm_is_in_grid((obstacle_x_mm, obstacle_y_mm)):
                 wall_x_index = self.__val_mm_to_index(obstacle_x_mm)
                 wall_y_index = self.__val_mm_to_index(obstacle_y_mm)
-                # We already counted a sample by setting a free line of sight, and the obstacle cell was wrongly counted as free
-                self.sums[wall_y_index][wall_x_index] -= self.FREE_VALUE
-                self.sums[wall_y_index][wall_x_index] += self.OCCUPIED_VALUE
+                # We already counted a free sample in the obstacle cell by calling __sample_free_line
+                self.free_samples[wall_y_index][wall_x_index] -= 1
 
         else:
             line_end_x_mm = tof_x_mm + tof_max_distance_mm * cos_angle
             line_end_y_mm = tof_y_mm + tof_max_distance_mm * sin_angle
             # Free line of sight
-            self.__free_line((tof_x_mm, tof_y_mm), (line_end_x_mm, line_end_y_mm))
+            self.__sample_free_line((tof_x_mm, tof_y_mm), (line_end_x_mm, line_end_y_mm))
 
     def to_image(self, height, width):
-        samples = self.samples.copy()
-        samples[self.samples == 0] = 1
-        means = cv2.divide(self.sums, samples)
-        return cv2.resize(src=means, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
-
-    def samples_image(self, height, width):
-        normalized_samples = self.samples / self.samples.max()
-        return cv2.resize(src=normalized_samples, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
+        self.__update_cells()
+        return cv2.resize(src=self.cells, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
 
     def walkable(self, radius_mm):
-        # This only works if free cells are 0
-        assert self.FREE_VALUE == 0 and self.FREE_VALUE < self.OCCUPIED_VALUE
-
-        # FIXME
         kernel = disk_kernel(self.__val_mm_to_index(radius_mm))
-        filtered = cv2.filter2D(src=self.sums, ddepth=-1, kernel=kernel)
-        return filtered
+        obstacles = np.zeros((self.height, self.width))
+        obstacles[self.cells > self.FREE_THRESHOLD] = 1
+        filtered = cv2.filter2D(src=obstacles, ddepth=-1, kernel=kernel)
+        return 1 - filtered
     
     def walkable_resized(self, radius_mm, height, width):
-        walkable = self.walkable(radius_mm=radius_mm)
+        walkable = self.walkable(radius_mm)
         return cv2.resize(src=walkable, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
 
     def __x_mm_is_in_grid(self, x_mm):
@@ -182,51 +165,30 @@ class Constructed_map:
     def __point_mm_to_index(self, point):
         return self.__val_mm_to_index(point[0]), self.__val_mm_to_index(point[1])
 
-    def __is_free(self, value):
-        if self.FREE_THRESHOLD < self.OCCUPIED_THRESHOLD:
-            return value <= self.FREE_THRESHOLD
-        else:
-            return value >= self.FREE_THRESHOLD
-
-    def __is_occupied(self, value):
-        if self.FREE_THRESHOLD < self.OCCUPIED_THRESHOLD:
-            return value >= self.OCCUPIED_THRESHOLD
-        else:
-            return value <= self.OCCUPIED_THRESHOLD
-
-    def __is_unknown(self, value):
-        return not self.__is_free(value) and not self.__is_occupied(value)
-
-    def __free_line(self, pt1_mm, pt2_mm):
+    def __sample_free_line(self, pt1_mm, pt2_mm):
         pt1 = self.__point_mm_to_index(pt1_mm)
         pt2 = self.__point_mm_to_index(pt2_mm)
 
-        # Add samples
-        to_add = np.zeros((self.height, self.width))
-        cv2.line(img=to_add, pt1=pt1, pt2=pt2, color=1)
-        cv2.add(self.samples, to_add, self.samples)
+        line_to_add = np.zeros((self.height, self.width), dtype=int)
+        cv2.line(img=line_to_add, pt1=pt1, pt2=pt2, color=1)
 
-        # Add values
-        to_add = np.zeros((self.height, self.width))
-        cv2.line(img=to_add, pt1=pt1, pt2=pt2, color=self.FREE_VALUE)
-        cv2.add(self.sums, to_add, self.sums)
+        cv2.add(self.free_samples, line_to_add, self.free_samples)
+        cv2.add(self.total_samples, line_to_add, self.total_samples)
 
-    def __free_disk(self, center_mm, radius_mm):
+    def __set_free_disk(self, center_mm, radius_mm):
         center = self.__point_mm_to_index(center_mm)
         radius = self.__val_mm_to_index(radius_mm)
+        cv2.circle(img=self.cells, center=center, radius=radius, color=1, thickness=-1)
 
-        # Add samples
-        to_add = np.zeros((self.height, self.width))
-        cv2.circle(img=to_add, center=center,
-                   radius=radius, color=1, thickness=-1)
-        cv2.add(self.samples, to_add, self.samples)
+    def __update_cells(self):
+        # Required for cv2.divide to be defined when dividing by 0
+        assert self.total_samples.dtype == int # more like 'integer type'
 
-        # Add values
-        to_add = np.zeros((self.height, self.width))
-        cv2.circle(img=to_add, center=center, radius=radius,
-                   color=self.FREE_VALUE, thickness=-1)
-        cv2.add(self.sums, to_add, self.sums)
-
+        means = cv2.divide(self.free_samples, self.total_samples)
+        means[self.total_samples == 0] = 0.5
+        free_probabilities = 0.5 + (means - 0.5) * (1 - np.power(0.5, self.total_samples))
+        uncertain_cells = np.logical_and(self.cells > 0, self.cells < 1)
+        self.cells = np.where(uncertain_cells, free_probabilities, self.cells)
 
 def disk_kernel(radius):
     """
