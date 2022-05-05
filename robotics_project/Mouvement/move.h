@@ -1,10 +1,10 @@
 #ifndef MOVE_H
 #define MOVE_H
 
-#define NB_MOVES 5
+#define MAX_MOVES 100
 // External functions
 
-void ReceiveSpeedInstMove(BaseSequentialStream* in,BaseSequentialStream* out, uint16_t size);
+void ReceiveSpeedInstMove(BaseSequentialStream* in,BaseSequentialStream* out);
 
 void RunSpeedInstSequence(void);
 

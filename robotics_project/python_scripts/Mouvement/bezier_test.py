@@ -51,6 +51,9 @@ def send_instr(file,port):
     for inf in command:                 #sends data
         ser.write(struct.pack(">H",inf))
 
+    for c in "END":
+        ser.write(c.encode('utf-8'))
+
     print("sent:",instr,len,command)
     confirm = ser.read(1).decode("ascii")
     print(confirm)

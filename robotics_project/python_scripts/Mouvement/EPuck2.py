@@ -12,12 +12,18 @@ class Epuck:
     wheel_space = 5.4
     cam_angle = np.pi/4
 
-    def __init__(self,xpos,ypos,phi):
+    def __init__(self,xpos=0,ypos=0,phi=0):
         self.x = xpos
         self.y = ypos
         self.phi = phi
         self.trail = []
         
+    def set(self,xpos,ypos,phi):
+        self.x = xpos
+        self.y = ypos
+        self.phi = phi
+        self.trail.clear()
+    
     def check_spd(self,spd):
         if spd > 1000 :
             return 0
@@ -132,12 +138,9 @@ class Epuck:
                 
         f.close()
         print(filename,"done.")
-    
 
+    def simulate(self,instrfile):
+        self.read_command_file(instrfile)
+        self.draw("#000000")
 
-def simulate(instrfile,start=[0,0,0]):
-    robot = Epuck(start[0],start[1],start[2])
-    robot.read_command_file(instrfile)
-    robot.draw("#000000")
-
-    plt.show()
+        plt.show()

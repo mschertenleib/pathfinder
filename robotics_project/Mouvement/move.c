@@ -1,5 +1,6 @@
 #include "ch.h"
 #include "hal.h"
+#include "leds.h"
 #include <main.h>
 #include <motors.h>
 #include <usbcfg.h>
@@ -7,7 +8,8 @@
 
 #include <move.h>
 
-uint16_t move_sequence[NB_MOVES*3];
+int16_t move_sequence[3*MAX_MOVES] = {'\0'};
+uint8_t size_move = 0;
 bool running_sequence = FALSE;
 
 // semaphore if sequence has been uploaded
@@ -17,18 +19,17 @@ static BSEMAPHORE_DECL(sequence_ready_sem, TRUE);
 *	Receives int16 values from the computer and fill a uint16 array with 
     3 numbers: left motor speed, right motor speed, runtime(in ms). 
     Size is the number of instructions to be recieved.
-*	=> data should be of size (3 * size)
 
 *   data = [left speed 0,right speed 0, runtime 0, left speed 1, right speed 1, runtime 1, ...]
-*   command example : MOVE nbinstr instructions
+*   command example : MOVE nbinstr instructions END
 */
-void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out, uint16_t size)
+void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 {
     volatile uint8_t l1,l2,r1,r2,t1,t2;
-	volatile uint16_t temp_size = 0;
-	uint16_t i=0;
+	volatile uint16_t i=0;
 
 	if(!running_sequence){
+		set_body_led(1);
 		uint8_t state = 0;
 		while(state != 4){
 
@@ -74,32 +75,44 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out, u
 
 		// The first 2 bytes is the length of the datas
 		// -> number of int16_t data
-		temp_size = (int16_t)((l2 | l1<<8));
-		//chprintf((BaseSequentialStream *) &SDU1,"Length : %x \r\n",temp_size);
+		size_move = (int16_t)((l2 | l1<<8));
+		size_move = size_move/3;
+		chprintf(out,"Length : %x \r\n",size_move);
 
-		if((temp_size/3) == size){
-			for(i = 0 ; i < (temp_size/3) ; i++){
+		while(1){
 
-				l1 = chSequentialStreamGet(in); //get first byte of leftspeed
-				l2 = chSequentialStreamGet(in); //get second byte of leftspeed
-				r1 = chSequentialStreamGet(in); //get first byte of rightspeed
-				r2 = chSequentialStreamGet(in); //get second byte of rightspeed
-				t1 = chSequentialStreamGet(in); //get first byte of runtime
-				t2 = chSequentialStreamGet(in); //get second byte of runtime
-
-				move_sequence[i*3] = (int16_t)((l2 | l1<<8));        // left speed
-				move_sequence[(i*3)+1] = (int16_t)((r2 | r1<<8));    // right speed
-				move_sequence[(i*3)+2] = (int16_t)((t2 | t1<<8));    // runtime
-
-				chprintf(out,"load %d L %d R %d T%d \r\n",i,move_sequence[i*3],move_sequence[(i*3)+1],move_sequence[(i*3)+2]);
+			l1 = chSequentialStreamGet(in); //get first byte of leftspeed
+			l2 = chSequentialStreamGet(in); //get second byte of leftspeed
+			r1 = chSequentialStreamGet(in); //get first byte of rightspeed
+			if(l1 == 'E' && l2 == 'N' && r1 == 'D'){
+				i++;
+				chprintf(out,"STOP Detected after %d moves\r\n",i);
+				break;
 			}
+			r2 = chSequentialStreamGet(in); //get second byte of rightspeed
+			t1 = chSequentialStreamGet(in); //get first byte of runtime
+			t2 = chSequentialStreamGet(in); //get second byte of runtime
 
-			chprintf(out,"M");
-			chBSemSignal(&sequence_ready_sem);
+			chprintf(out,"loading %d L %d R %d T%d \r\n",i,(int16_t)((l2 | l1<<8)),(int16_t)((r2 | r1<<8)),(int16_t)((t2 | t1<<8)));
+
+			move_sequence[i*3] = (int16_t)((l2 | l1<<8));        // left speed
+			move_sequence[(i*3)+1] = (int16_t)((r2 | r1<<8));    // right speed
+			move_sequence[(i*3)+2] = (int16_t)((t2 | t1<<8));    // runtime
+
+			i++;
+			if(i > MAX_MOVES-2) {
+				chprintf(out,"sequence too long !\r\n");
+				size_move = MAX_MOVES-2;
+				break;
+			}
 		}
+
+		chBSemSignal(&sequence_ready_sem);
+
 	}else{
 		chprintf(out,"cannot load sequence, main sequence being used %d \r\n",chSequentialStreamGet(in));
 	}
+	set_body_led(0);
 }
 
 
@@ -113,18 +126,24 @@ static THD_FUNCTION(moveThread,arg){
 		chBSemWait(&sequence_ready_sem);
 
 		running_sequence = TRUE;
-		static uint8_t size = sizeof(move_sequence)/(sizeof(uint16_t)*3);
-		for(uint8_t i = 0 ; i < size ; i++){
-			left_motor_set_speed(move_sequence[i*3]);
-			right_motor_set_speed(move_sequence[(i*3)+1]);
-			chThdSleepMilliseconds(move_sequence[(i*3)+2]);
-			chprintf((BaseSequentialStream *) &SD3,"running: %d L%d R%d T%d \r\n",i,move_sequence[i*3],move_sequence[(i*3)+1],move_sequence[(i*3)+2]);
+		int16_t lspd = 0;
+		int16_t rspd = 0;
+		int16_t stime = 0;
+		for(uint8_t i = 0; i < (size_move); i++){
+			lspd = move_sequence[i*3];
+			rspd = move_sequence[(i*3)+1];
+			stime = move_sequence[(i*3)+2];
+			left_motor_set_speed(lspd);
+			right_motor_set_speed(rspd);
+			chprintf((BaseSequentialStream *) &SD3,"running %d L %d R %d for %d ms \r\n",i,lspd,rspd,stime);
+			chThdSleepMilliseconds(stime);
 		}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		chThdSleepMilliseconds(100);
-		chprintf((BaseSequentialStream *) &SD3,"DONE");
+		chprintf((BaseSequentialStream *) &SD3,"DONE\r\n");
 		running_sequence = FALSE;
+		set_body_led(1);
 		chBSemReset(&sequence_ready_sem,TRUE);
 	}
 }

@@ -19,6 +19,8 @@ messagebus_t bus;
 MUTEX_DECL(bus_lock);
 CONDVAR_DECL(bus_condvar);
 
+#define BTH (BaseSequentialStream* ) &SD3
+
 static void serial_start(void) {
 	static SerialConfig ser_cfg = { 115200, 0, 0, 0, };
 
@@ -37,24 +39,6 @@ static void timer12_start(void) {
 	//let the timer count to max value
 	gptStartContinuous(&GPTD12, 0xFFFF);
 }
-
-
-static THD_WORKING_AREA(blinkThreadArea,512);
-static THD_FUNCTION(blinkThread,arg){
-
-	chRegSetThreadName(__FUNCTION__);
-	(void) arg;
-
-	while(TRUE){
-
-		chprintf((BaseSequentialStream *) &SDU1,"ping!\r\n");
-		/*dac_play(440);
-		chThdSleepMilliseconds(10);
-		dac_stop();*/
-		chThdSleepMilliseconds(1000);
-	}
-}
-
 
 int main(void) {
 
@@ -76,15 +60,14 @@ int main(void) {
 	motors_init();
 	//init move thread
 	lauch_move_thd();
-	//serial checksender
-	//chThdCreateStatic(blinkThreadArea,sizeof(blinkThreadArea),NORMALPRIO-1,blinkThread,NULL);
 
 	/* Infinite loop. */
+	volatile uint8_t l1;
 	while (1) {
-
-		ReceiveSpeedInstMove((BaseSequentialStream* ) &SD3,(BaseSequentialStream *) &SD3, NB_MOVES);
 		
-		chprintf((BaseSequentialStream *) &SD3,"Loop Main\r\n");
+		ReceiveSpeedInstMove(BTH,BTH);
+
+		chprintf(BTH,"Loop Main\r\n");
 
 		chThdSleepMilliseconds(1000);
 	}
