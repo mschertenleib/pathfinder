@@ -16,8 +16,8 @@ class Environment_map:
         self.height_mm = height_mm
         self.width = self.__val_mm_to_index(self.width_mm)  # width in cells
         self.height = self.__val_mm_to_index(self.height_mm)  # height in cells
-        self.free_samples = np.zeros((self.height, self.width), dtype=int)
-        self.total_samples = np.zeros((self.height, self.width), dtype=int)
+        self.free_samples = np.zeros((self.height, self.width))
+        self.total_samples = np.zeros((self.height, self.width))
         self.cells = np.ones((self.height, self.width)) * 0.5
 
     def set_all_free(self):
@@ -180,17 +180,15 @@ class Environment_map:
         pt1 = self.__point_mm_to_index(pt1_mm)
         pt2 = self.__point_mm_to_index(pt2_mm)
 
-        line_to_add = np.zeros((self.height, self.width), dtype=int)
+        line_to_add = np.zeros((self.height, self.width))
         cv2.line(img=line_to_add, pt1=pt1, pt2=pt2, color=1)
 
-        cv2.add(self.free_samples, line_to_add, self.free_samples)
-        cv2.add(self.total_samples, line_to_add, self.total_samples)
+        self.free_samples = cv2.add(self.free_samples, line_to_add)
+        self.total_samples = cv2.add(self.total_samples, line_to_add)
 
     def __update_cells(self):
-        # Required for cv2.divide to be defined when dividing by 0
-        assert self.total_samples.dtype == int
-
         means = cv2.divide(self.free_samples, self.total_samples)
+        means[self.total_samples == 0] = 0.5
         free_probabilities = 0.5 + (means - 0.5) * (1 - np.power(0.5, self.total_samples))
         cells_to_update = np.logical_and(self.cells > 0, self.cells < 1, self.total_samples > 0)
         self.cells = np.where(cells_to_update, free_probabilities, self.cells)

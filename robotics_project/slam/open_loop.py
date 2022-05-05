@@ -39,8 +39,8 @@ def draw_robot(img, robot_x_mm, robot_y_mm, robot_angle_rad, robot_radius_mm, co
 
 def main():
 
-    width_mm = 640
-    height_mm = 480
+    width_mm = 800
+    height_mm = 800
     cell_size_mm = 10
     robot_radius_mm = 35
     tof_sensor_offset_mm = robot_radius_mm
@@ -71,21 +71,10 @@ def main():
         robot_x_mm, robot_y_mm, robot_angle_rad, distance_mm = next(
             data_generator)
 
-        old_free = constructed_map.free_samples.copy()
-        old_total = constructed_map.total_samples.copy()
-        old_cells = constructed_map.cells.copy()
-
         constructed_map.construct((robot_x_mm, robot_y_mm), robot_angle_rad,
                                   robot_radius_mm, distance_mm, tof_sensor_offset_mm, tof_max_distance_mm)
 
         map_image = constructed_map.to_image(height=height_px, width=width_px)
-
-        delta_image = cv2.subtract(map_image, old_map_image)
-        delta_image = cv2.resize(delta_image, (width_px//cell_size_mm,
-                                 height_px//cell_size_mm), interpolation=cv2.INTER_NEAREST)
-        old_map_image = map_image
-        if delta_image.max() > 0.5 or delta_image.min() < -0.5:
-            assert False
 
         img = cv2.merge([map_image] * 3)
 
@@ -104,8 +93,7 @@ def main():
                 cv2.line(img, start, end, (0, 0, 255))
 
         cv2.imshow('Constructed map', img)
-        cv2.imshow('Walkable', constructed_map.walkable_resized(
-            robot_radius_mm, height_px, width_px))
+        #cv2.imshow('Walkable', constructed_map.walkable_resized(robot_radius_mm, height_px, width_px))
 
         k = cv2.waitKey(1)
         if k == 27:  # Esc
