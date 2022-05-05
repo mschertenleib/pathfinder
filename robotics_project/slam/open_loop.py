@@ -1,5 +1,9 @@
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+import serial
+import struct
+import sys
 import environment_map as envmap
 
 
@@ -39,8 +43,8 @@ def draw_robot(img, robot_x_mm, robot_y_mm, robot_angle_rad, robot_radius_mm, co
 
 def main():
 
-    width_mm = 800
-    height_mm = 800
+    width_mm = 640
+    height_mm = 480
     cell_size_mm = 10
     robot_radius_mm = 35
     tof_sensor_offset_mm = robot_radius_mm
@@ -64,9 +68,7 @@ def main():
     data_generator = robot_data_generator(
         true_map, tof_sensor_offset_mm, tof_default_distance_mm, True)
 
-    old_map_image = constructed_map.to_image(height=height_px, width=width_px)
-
-    while(True):
+    while True:
 
         robot_x_mm, robot_y_mm, robot_angle_rad, distance_mm = next(
             data_generator)
@@ -93,7 +95,7 @@ def main():
                 cv2.line(img, start, end, (0, 0, 255))
 
         cv2.imshow('Constructed map', img)
-        #cv2.imshow('Walkable', constructed_map.walkable_resized(robot_radius_mm, height_px, width_px))
+        cv2.imshow('Walkable', constructed_map.walkable_resized(robot_radius_mm, height_px, width_px))
 
         k = cv2.waitKey(1)
         if k == 27:  # Esc
