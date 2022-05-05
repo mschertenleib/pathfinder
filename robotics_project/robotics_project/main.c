@@ -10,6 +10,7 @@
 #include <chprintf.h>
 #include <arm_math.h>
 #include <motors.h>
+#include <communications.h>
 #include <audio/microphone.h>
 #include <camera/po8030.h>
 #include <sensors/VL53L0X/VL53L0X.h>
