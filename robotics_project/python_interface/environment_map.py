@@ -22,16 +22,21 @@ class Environment_map:
 
     def set_all_free(self):
         """
-        @brief      Set all cells on the map to be free
+        Set all cells on the map to be free
         """
 
         self.cells = np.ones((self.height, self.width))
 
     def occupied_line(self, pt1_mm, pt2_mm):
         """
-        @brief              Generate an occupied line on the map
-        @param pt1_mm       The first position in mm
-        @param pt2_mm       The second position in mm
+        Generate an occupied line on the map
+
+        Parameters
+        ---
+        pt1_mm:
+            The first position in mm
+        pt2_mm:
+            The second position in mm
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
@@ -40,9 +45,14 @@ class Environment_map:
 
     def occupied_line_normalized(self, pt1, pt2):
         """
-        @brief              Generate an occupied line on the map
-        @param pt1          The first position, fraction [0, 1[ of the width of the map
-        @param pt2          The second position, fraction [0, 1[ of the height of the map
+        Generate an occupied line on the map
+
+        Parameters
+        ---
+        pt1:
+            The first position, fraction [0, 1[ of the width of the map
+        pt2:
+            The second position, fraction [0, 1[ of the height of the map
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
@@ -51,9 +61,14 @@ class Environment_map:
 
     def occupied_rectangle(self, pt1_mm, pt2_mm):
         """
-        @brief              Generate an occupied rectangle on the map
-        @param pt1_mm       The first corner position in mm
-        @param pt2_mm       The second corner position in mm
+        Generate an occupied rectangle on the map
+
+        Parameters:
+        ---
+        pt1_mm:
+            The first corner position in mm
+        pt2_mm:
+            The second corner position in mm
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
@@ -62,9 +77,14 @@ class Environment_map:
 
     def occupied_filled_rectangle(self, pt1_mm, pt2_mm):
         """
-        @brief              Generate an occupied filled rectangle on the map
-        @param pt1_mm       The first corner position in mm
-        @param pt2_mm       The second corner position in mm
+        Generate an occupied filled rectangle on the map
+
+        Parameters:
+        ---
+        pt1_mm:
+            The first corner position in mm
+        pt2_mm:
+            The second corner position in mm
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
@@ -73,9 +93,14 @@ class Environment_map:
 
     def occupied_rectangle_normalized(self, pt1, pt2):
         """
-        @brief              Generate an occupied rectangle on the map
-        @param pt1          The first corner position, fraction [0, 1[ of the width of the map
-        @param pt2          The second corner position, fraction [0, 1[ of the height of the map
+        Generate an occupied rectangle on the map
+
+        Parameters:
+        ---
+        pt1:
+            The first corner position, fraction [0, 1[ of the width of the map
+        pt2:
+            The second corner position, fraction [0, 1[ of the height of the map
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
@@ -84,9 +109,14 @@ class Environment_map:
 
     def occupied_filled_rectangle_normalized(self, pt1, pt2):
         """
-        @brief              Generate an occupied filled rectangle on the map
-        @param pt1          The first corner position, fraction [0, 1[ of the width of the map
-        @param pt2          The second corner position, fraction [0, 1[ of the height of the map
+        Generate an occupied filled rectangle on the map
+
+        Parameters:
+        ---
+        pt1:
+            The first corner position, fraction [0, 1[ of the width of the map
+        pt2:
+            The second corner position, fraction [0, 1[ of the height of the map
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
@@ -95,9 +125,14 @@ class Environment_map:
 
     def occupied_circle(self, center_mm, radius_mm):
         """
-        @brief              Generate an occupied circle on the map
-        @param center_mm    The center position in millimeters
-        @param radius_mm    The radius in millimeters
+        Generate an occupied circle on the map
+
+        Parameters:
+        ---
+        center_mm:
+            The center position in millimeters
+        radius_mm:
+            The radius in millimeters
         """
 
         center = self.__point_mm_to_index(center_mm)
@@ -106,9 +141,14 @@ class Environment_map:
 
     def occupied_filled_circle(self, center_mm, radius_mm):
         """
-        @brief              Generate an occupied circle on the map
-        @param center_mm    The center position in millimeters
-        @param radius_mm    The radius in millimeters
+        Generate an occupied circle on the map
+        
+        Parameters:
+        ---
+        center_mm:
+            The center position in millimeters
+        radius_mm:
+            The radius in millimeters
         """
 
         center = self.__point_mm_to_index(center_mm)
@@ -117,9 +157,14 @@ class Environment_map:
 
     def free_line(self, pt1_mm, pt2_mm):
         """
-        @brief              Generate a free line on the map
-        @param pt1_mm       The first position in mm
-        @param pt2_mm       The second position in mm
+        Generate a free line on the map
+
+        Parameters:
+        ---
+        pt1_mm:
+            The first position in mm
+        pt2_mm:
+            The second position in mm
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
@@ -128,9 +173,14 @@ class Environment_map:
 
     def free_line_normalized(self, pt1, pt2):
         """
-        @brief              Generate a free line on the map
-        @param pt1          The first position, fraction [0, 1[ of the width of the map
-        @param pt2          The second position, fraction [0, 1[ of the height of the map
+        Generate a free line on the map
+
+        Parameters:
+        ---
+        pt1:
+            The first position, fraction [0, 1[ of the width of the map
+        pt2:
+            The second position, fraction [0, 1[ of the height of the map
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
@@ -139,9 +189,14 @@ class Environment_map:
 
     def free_rectangle(self, pt1_mm, pt2_mm):
         """
-        @brief              Generate a free rectangle on the map
-        @param pt1_mm       The first corner position in mm
-        @param pt2_mm       The second corner position in mm
+        Generate a free rectangle on the map
+
+        Parameters:
+        ---
+        pt1_mm:
+            The first corner position in mm
+        pt2_mm:
+            The second corner position in mm
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
@@ -150,9 +205,14 @@ class Environment_map:
 
     def free_filled_rectangle(self, pt1_mm, pt2_mm):
         """
-        @brief              Generate a free rectangle on the map
-        @param pt1_mm       The first corner position in mm
-        @param pt2_mm       The second corner position in mm
+        Generate a free rectangle on the map
+
+        Parameters:
+        ---
+        pt1_mm:
+            The first corner position in mm
+        pt2_mm:
+            The second corner position in mm
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
@@ -161,9 +221,14 @@ class Environment_map:
 
     def free_rectangle_normalized(self, pt1, pt2):
         """
-        @brief              Generate a free rectangle on the map
-        @param pt1          The first corner position, fraction [0, 1[ of the width of the map
-        @param pt2          The second corner position, fraction [0, 1[ of the height of the map
+        Generate a free rectangle on the map
+
+        Parameters:
+        ---
+        pt1:
+            The first corner position, fraction [0, 1[ of the width of the map
+        pt2:
+            The second corner position, fraction [0, 1[ of the height of the map
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
@@ -172,9 +237,14 @@ class Environment_map:
 
     def free_filled_rectangle_normalized(self, pt1, pt2):
         """
-        @brief              Generate a free rectangle on the map
-        @param pt1          The first corner position, fraction [0, 1[ of the width of the map
-        @param pt2          The second corner position, fraction [0, 1[ of the height of the map
+        Generate a free rectangle on the map
+
+        Parameters:
+        ---
+        pt1:
+            The first corner position, fraction [0, 1[ of the width of the map
+        pt2:
+            The second corner position, fraction [0, 1[ of the height of the map
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
@@ -183,9 +253,14 @@ class Environment_map:
 
     def free_circle(self, center_mm, radius_mm):
         """
-        @brief              Generate a free circle on the map
-        @param center_mm    The center position in millimeters
-        @param radius_mm    The radius in millimeters
+        Generate a free circle on the map
+
+        Parameters:
+        ---
+        center_mm:
+            The center position in millimeters
+        radius_mm:
+            The radius in millimeters
         """
 
         center = self.__point_mm_to_index(center_mm)
@@ -194,9 +269,14 @@ class Environment_map:
 
     def free_filled_circle(self, center_mm, radius_mm):
         """
-        @brief              Generate a free circle on the map
-        @param center_mm    The center position in millimeters
-        @param radius_mm    The radius in millimeters
+        Generate a free circle on the map
+
+        Parameters:
+        ---
+        center_mm:
+            The center position in millimeters
+        radius_mm:
+            The radius in millimeters
         """
 
         center = self.__point_mm_to_index(center_mm)
@@ -205,11 +285,20 @@ class Environment_map:
 
     def raycast(self, start_pos_mm, angle_rad, default_distance_mm):
         """
-        @brief                      Returns the distance from start_pos_mm to the closest obstacle in the angle_rad direction, or default_distance_mm if no obstacle intersection was found
-        @param start_pos_mm         The starting position in millimeters
-        @param angle_rad            The angle in radians
-        @param default_distance_mm  The default distance to return if no obstacle was hit
-        @return                     The computed distance
+        Returns the distance from start_pos_mm to the closest obstacle in the angle_rad direction, or default_distance_mm if no obstacle intersection was found
+        
+        Parameters:
+        ---
+        start_pos_mm:
+            The starting position in millimeters
+        angle_rad:
+            The angle in radians
+        default_distance_mm:
+            The default distance to return if no obstacle was hit
+        
+        Returns
+        ---
+        The computed distance
         """
 
         start_x_mm, start_y_mm = start_pos_mm
@@ -227,13 +316,22 @@ class Environment_map:
 
     def construct(self, robot_pos_mm, robot_angle_rad, robot_radius_mm, tof_distance_mm, tof_sensor_offset_mm, tof_max_distance_mm):
         """
-        @brief                          Construct a part of the map
-        @param robot_pos_mm             The robot position in millimeters
-        @param robot_angle_rad          The robot orientation in millimeters
-        @param robot_radius_mm          The robot radius in millimeters
-        @param tof_distance_mm          The measured TOF distance in millimeters
-        @param tof_sensor_offset_mm     The distance from the center of the robot to the TOF in millimeters
-        @param tof_max_distance_mm      The maximum distance measurable by the TOF sensor in millimeters
+        Construct a part of the map
+        
+        Parameters:
+        ---
+        robot_pos_mm:
+            The robot position in millimeters
+        robot_angle_rad:
+            The robot orientation in millimeters
+        robot_radius_mm:
+            The robot radius in millimeters
+        tof_distance_mm:
+            The measured TOF distance in millimeters
+        tof_sensor_offset_mm:
+            The distance from the center of the robot to the TOF in millimeters
+        tof_max_distance_mm:
+            The maximum distance measurable by the TOF sensor in millimeters
         """
 
         # Free disk where the robot is located
@@ -271,21 +369,38 @@ class Environment_map:
 
     def to_image(self, height, width):
         """
-        @brief              Returns a (height, width) grayscale numpy image of the map
-        @param height       The height of the image in pixels
-        @param width        The width of the image in pixels
-        @return             The image
+        Returns a (height, width) grayscale numpy image of the map
+        
+        Parameters:
+        ---
+        height:
+            The height of the image in pixels
+        width:
+            The width of the image in pixels
+        
+        Returns
+        ---
+        The image
         """
 
         return cv2.resize(src=self.cells, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
 
     def walkable(self, radius_mm, height, width):
         """
-        @brief              Returns a (height, width) numpy image of the cells of the map that are at least radius_mm millimeters from any obstacle. A 1 (white) represents a valid cell, a 0 (black) represents an invalid cell
-        @param radius_mm    The required minimum distance from any obstacle in millimeters
-        @param height       The height of the image in pixels
-        @param width        The width of the image in pixels
-        @return             The image
+        Returns a (height, width) numpy image of the cells of the map that are at least radius_mm millimeters from any obstacle. A 1 (white) represents a valid cell, a 0 (black) represents an invalid cell
+        
+        Parameters:
+        ---
+        radius_mm:
+            The required minimum distance from any obstacle in millimeters
+        height:
+            The height of the image in pixels
+        width:
+            The width of the image in pixels
+        
+        Returns
+        ---
+        The image
         """
 
         walkable = self.__walkable(radius_mm)
@@ -293,11 +408,20 @@ class Environment_map:
 
     def find_path(self, start_mm, goal_mm, radius_mm):
         """
-        @brief              Finds the shortest path between start_mm and goal_mm, always keeping at least a radius_mm distance to the nearest obstacle
-        @param start_mm     The starting (x, y) point in millimeters
-        @param goal_mm      The goal (x, y) point in millimeters
-        @param radius_mm    The minimum distance in millimeters to always keep to any obstacle
-        @return             The list of points (in millimeter coordinates) forming the path, including start and goal, or an empty list if no path was found
+        Finds the shortest path between start_mm and goal_mm, always keeping at least a radius_mm distance to the nearest obstacle
+        
+        Parameters:
+        ---
+        start_mm:
+            The starting (x, y) point in millimeters
+        goal_mm:
+            The goal (x, y) point in millimeters
+        radius_mm:
+            The minimum distance in millimeters to always keep to any obstacle
+        
+        Returns
+        ---
+        The list of points (in millimeter coordinates) forming the path, including start and goal, or an empty list if no path was found
         """
 
         start = self.__point_mm_to_index(start_mm)
@@ -308,27 +432,48 @@ class Environment_map:
 
     def __x_mm_is_in_grid(self, x_mm):
         """
-        @brief              Checks whether the given x coordinate in millimeters lies in the grid
-        @param x_mm         The x coordinate in millimeters to check
-        @return             True if the coordinate is in the grid, else False
+        Checks whether the given x coordinate in millimeters lies in the grid
+        
+        Parameters:
+        ---
+        x_mm:
+            The x coordinate in millimeters to check
+        
+        Returns
+        ---
+        True if the coordinate is in the grid, else False
         """
 
         return x_mm >= 0 and x_mm < self.width_mm
 
     def __y_mm_is_in_grid(self, y_mm):
         """
-        @brief              Checks whether the given y coordinate in millimeters lies in the grid
-        @param y_mm         The y coordinate in millimeters to check
-        @return             True if the coordinate is in the grid, else False
+        Checks whether the given y coordinate in millimeters lies in the grid
+        
+        Parameters:
+        ---
+        y_mm:
+            The y coordinate in millimeters to check
+        
+        Returns
+        ---
+        True if the coordinate is in the grid, else False
         """
 
         return y_mm >= 0 and y_mm < self.height_mm
 
     def __point_mm_is_in_grid(self, point_mm):
         """
-        @brief              Checks whether the given (x, y) point in millimeters lies in the grid
-        @param point_mm     The (x, y) point in millimeters to check
-        @return             True if the point is in the grid, else False
+        Checks whether the given (x, y) point in millimeters lies in the grid
+        
+        Parameters:
+        ---
+        point_mm:
+            The (x, y) point in millimeters to check
+        
+        Returns
+        ---
+        True if the point is in the grid, else False
         """
 
         x_mm, y_mm = point_mm
@@ -336,46 +481,79 @@ class Environment_map:
 
     def __val_mm_to_index(self, val_mm):
         """
-        @brief          Converts a coordinate in millimeters to an index
-        @param index    The coordinate in millimeters to convert
-        @return         The grid index
+        Converts a coordinate in millimeters to an index
+        
+        Parameters:
+        ---
+        index:
+            The coordinate in millimeters to convert
+        
+        Returns
+        ---
+        The grid index
         """
 
         return int(val_mm / self.cell_size_mm)
 
     def __point_mm_to_index(self, point_mm):
         """
-        @brief              Converts an (x, y) point in millimeters to an (x, y) index pair
-        @param point_mm     The (x, y) coordinates in millimeters
-        @return             The (x, y) index of the point in the grid
+        Converts an (x, y) point in millimeters to an (x, y) index pair
+        
+        Parameters:
+        ---
+        point_mm:
+            The (x, y) coordinates in millimeters
+        
+        Returns
+        ---
+        The (x, y) index of the point in the grid
         """
 
         return self.__val_mm_to_index(point_mm[0]), self.__val_mm_to_index(point_mm[1])
 
     def __index_to_val_mm(self, index):
         """
-        @brief          Converts an index to a coordinate in millimeters
-        @param index    The grid index to convert
-        @return         The coordinate in millimeters
+        Converts an index to a coordinate in millimeters
+        
+        Parameters:
+        ---
+        index    The grid index to convert
+        
+        Returns
+        ---
+        The coordinate in millimeters
         """
 
         return (index + 0.5) * self.cell_size_mm
 
     def __index_to_point_mm(self, index_x, index_y):
         """
-        @brief              Converts an (x, y) index pair to an (x, y) point in millimeters
-        @param index_x      The horizontal coordinate of the point in the grid
-        @param index_y      The vertical coordinate of the point in the grid
-        @return             The (x, y) point in millimeters
+        Converts an (x, y) index pair to an (x, y) point in millimeters
+        
+        Parameters:
+        ---
+        index_x:
+            The horizontal coordinate of the point in the grid
+        index_y:
+            The vertical coordinate of the point in the grid
+        
+        Returns
+        ---
+        The (x, y) point in millimeters
         """
 
         return self.__index_to_val_mm(index_x), self.__index_to_val_mm(index_y)
 
     def __sample_free_line(self, pt1_mm, pt2_mm):
         """
-        @brief          Updates the samples with a free line from pt1_mm to pt2_mm
-        @param pt1_mm   The starting (x, y) point in millimeters
-        @param pt2_mm   The ending (x, y) point in millimeters
+        Updates the samples with a free line from pt1_mm to pt2_mm
+        
+        Parameters:
+        ---
+        pt1_mm:
+            The starting (x, y) point in millimeters
+        pt2_mm:
+            The ending (x, y) point in millimeters
         """
 
         pt1 = self.__point_mm_to_index(pt1_mm)
@@ -389,7 +567,7 @@ class Environment_map:
 
     def __update_cells(self):
         """
-        @brief      Updates all the cells of the map depending on their previous value and the samples
+        Updates all the cells of the map depending on their previous value and the samples
         """
 
         means = cv2.divide(self.free_samples, self.total_samples)
@@ -402,9 +580,16 @@ class Environment_map:
 
     def __walkable(self, radius_mm):
         """
-        @brief              Returns a numpy grid of the cells of the map that are at least radius_mm millimeters from any obstacle. A 1 (white) represents a valid cell, a 0 (black) represents an invalid cell
-        @param radius_mm    The required minimum distance from any obstacle in millimeters
-        @return             The grid
+        Returns a numpy grid of the cells of the map that are at least radius_mm millimeters from any obstacle. A 1 (white) represents a valid cell, a 0 (black) represents an invalid cell
+        
+        Parameters:
+        ---
+        radius_mm:
+            The required minimum distance from any obstacle in millimeters
+        
+        Returns
+        ---
+            The grid
         """
 
         kernel = disk_kernel(self.__val_mm_to_index(radius_mm))
@@ -418,11 +603,20 @@ class Environment_map:
 
     def __find_path(self, start_coords, goal_coords, radius_mm):
         """
-        @brief                  Finds the shortest path between start_coords and goal_coords, always keeping at least a radius_mm distance to the nearest obstacle
-        @param start_coords     The starting (x, y) coordinates
-        @param goal_coords      The goal (x, y) coordinates
-        @param radius_mm        The minimum distance in millimeters to always keep to any obstacle
-        @return                 The list of points forming the path, including start and goal, or an empty list if no path was found
+        Finds the shortest path between start_coords and goal_coords, always keeping at least a radius_mm distance to the nearest obstacle
+        
+        Parameters:
+        ---
+        start_coords:
+            The starting (x, y) coordinates
+        goal_coords:
+            The goal (x, y) coordinates
+        radius_mm:
+            The minimum distance in millimeters to always keep to any obstacle
+        
+        Returns
+        ---
+        The list of points forming the path, including start and goal, or an empty list if no path was found
         """
 
         walkable_cells = self.__walkable(radius_mm)
@@ -436,9 +630,16 @@ class Environment_map:
 
 def disk_kernel(radius):
     """
-    @brief          Returns a kernel (a 2D numpy array) consisting of a disk of 1's
-    @param radius   The radius of the disk (the kernel has a size of 2 * radius + 1)
-    @return         The constructed kernel
+    Returns a kernel (a 2D numpy array) consisting of a disk of 1's
+    
+    Parameters:
+    ---
+    radius:
+        The radius of the disk (the kernel has a size of 2 * radius + 1)
+    
+    Returns
+    ---
+    The constructed kernel
     """
 
     kernel_size = 2 * radius + 1
