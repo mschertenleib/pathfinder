@@ -651,7 +651,7 @@ class Environment_map:
         pt2 = self.__point_mm_to_index(pt2_mm)
 
         line_to_add = np.zeros((self.height, self.width))
-        cv2.line(img=line_to_add, pt1=pt1, pt2=pt2, color=1)
+        cv2.line(img=line_to_add, pt1=pt1, pt2=pt2, color=1, thickness=2)
 
         self.free_samples = cv2.add(self.free_samples, line_to_add)
         self.total_samples = cv2.add(self.total_samples, line_to_add)

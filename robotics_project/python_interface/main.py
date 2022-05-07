@@ -24,6 +24,8 @@ size = 50  # size of the map in cm
 
 original_stdout = sys.stdout
 
+com_port = 'COM15'
+
 instrfile = 'instructions.txt'  # sys.argv[1][2:]
 #APRPP = int(sys.argv[2])
 timecom = 1000  # int(sys.argv[3])*1000
@@ -147,7 +149,7 @@ class Move:
     def genfile(self, filename):
         f = open(filename, 'w')
         sys.stdout = f  # Change the standard output to the file we created.
-        print('MOVE')
+        print('!MOVE')
         nb_word = len(self.command)*3
         print(nb_word)
 
@@ -261,6 +263,30 @@ def listen_ser(port, time):
     print("stopped listening.", i)
     ser.close()
 
+
+def read_robot_data(ser: serial.Serial, time):
+    i = 0
+    ret = str()
+    while i < time:
+        bytesToRead = ser.inWaiting()
+        serstr = ser.read(bytesToRead)
+        if serstr != b'':
+            i = 0
+            ascii_string = serstr.decode("ascii")
+            print(ascii_string)
+            if len(ret) == 0 and ascii_string.find('SCAN') != 0:
+                print('Unexpected bytes received')
+                return []
+
+            ret += ascii_string
+            if ascii_string.find('MAP') != -1:
+                break
+        else:
+            i += 1
+    print("stopped listening.", i)
+    ser.close()
+    return ret
+
 ################################# Events Functions #################################
 
 
@@ -268,31 +294,83 @@ def on_mouse_button_press(event):
     if not event.inaxes:
         return
 
-    if event.inaxes is map_ax:
-        if event.button is MouseButton.LEFT:
-            x_mm, y_mm = event.xdata, event.ydata
-            constructed_map.set_occupied(x_mm, y_mm)
+    # if event.inaxes is map_ax:
+        # if event.button is MouseButton.LEFT:
+        #    x_mm, y_mm = event.xdata, event.ydata
+        #    constructed_map.set_occupied(x_mm, y_mm)
 
-        elif event.button is MouseButton.RIGHT:
-            global ix, iy
-            ix, iy = event.xdata, event.ydata
-            print('x = %.2f, y = %.2f' % (ix, iy))
-            current_move.data.append([ix, iy])
-            x = []
-            y = []
-            for point in current_move.data:
-                x.append(point[0])
-                y.append(point[1])
-            map_ax.plot(x, y, c="#00ff55")
+        # elif event.button is MouseButton.RIGHT:
+        #    global ix, iy
+        #    ix, iy = event.xdata, event.ydata
+        #    print('x = %.2f, y = %.2f' % (ix, iy))
+        #    current_move.data.append([ix, iy])
+        #    x = []
+        #    y = []
+        #    for point in current_move.data:
+        #        x.append(point[0])
+        #        y.append(point[1])
+        #    map_ax.plot(x, y, c="#00ff55")
 
 
 def action_send_instruction():
-    send_instr(instrfile, "COM6")
-    listen_ser("COM6", 1e6)
+    send_instr(instrfile, com_port)
+    listen_ser(com_port, 1e6)
 
 
 def action_listen():
-    listen_ser("COM6", 1e6)
+    listen_ser(com_port, 1e6)
+
+
+def action_scan():
+    ser = serial.Serial(com_port, 57600, timeout=5)
+
+    for c in '!SCAN':  # send instr like "MOVE"
+        ser.write(c.encode('utf-8'))
+
+    ser.write(struct.pack(">B", 2))
+    
+    data = read_robot_data(ser, 1e6)
+    construct_from_read_scan(data)
+
+
+def construct_from_read_scan(data):
+    lines = data.splitlines()
+    if len(lines) == 0:
+        return
+
+    if lines[0][0:4] != 'SCAN':
+        print('Unexpected command while converting scan data')
+        return
+
+    x_str, y_str, angle_str = lines[1].split(' ')
+    x_mm, y_mm, angle_rad = float(x_str[1:]) * 10, float(y_str[1:]) * 10, float(angle_str[1:])
+    
+    #angle_rad = np.pi / 2 - angle_rad
+
+    for string_line in lines[2:len(lines)-3]:
+        print('Line:', string_line)
+        
+        if not string_line:
+            return
+
+        (x_mm, y_mm, angle_rad, distance_mm) = convert_read_scan_to_x_y_angle_dist(
+            x_mm, y_mm, string_line)
+        robot.set(x_mm, y_mm, angle_rad)
+        constructed_map.construct((x_mm, y_mm), angle_rad, EPuck2.Epuck.RADIUS_MM, distance_mm,
+                                  EPuck2.Epuck.TOF_SENSOR_OFFSET_MM, EPuck2.Epuck.TOF_MAX_DISTANCE_MM)
+        update()
+    
+    if lines[len(lines)-2].find('MAP') == -1:
+        print('Unexpected ending to the message')
+        return
+
+
+def convert_read_scan_to_x_y_angle_dist(x_mm, y_mm, data: str):
+    angle_str, distance_str = data.split(' ')
+    angle_rad = float(angle_str[1:])
+    distance_mm = float(distance_str[1:])
+    print('Converted', angle_rad, distance_mm)
+    return (x_mm, y_mm, angle_rad, distance_mm)
 
 
 def action_restart():
@@ -339,14 +417,14 @@ def on_key_press(event):
         action_stg()
 
 
-def construct_map():
+def construct_map_generated():
     robot_x_mm, robot_y_mm, robot_angle_rad, distance_mm = next(data_generator)
     robot.set(robot_x_mm, robot_y_mm, robot_angle_rad)
     constructed_map.construct((robot_x_mm, robot_y_mm), robot_angle_rad, EPuck2.Epuck.RADIUS_MM,
                               distance_mm, EPuck2.Epuck.TOF_SENSOR_OFFSET_MM, EPuck2.Epuck.TOF_MAX_DISTANCE_MM)
 
 
-def update():    
+def update():
     map_image = constructed_map.to_image(height=height_px, width=width_px)
 
     img = cv2.merge([map_image] * 3)
@@ -361,16 +439,17 @@ def update():
             start = (int(path[i][0]), int(path[i][1]))
             end = (int(path[i+1][0]), int(path[i+1][1]))
             cv2.line(img, start, end, (0, 0, 1))
-    
+
     map_ax.clear()
     map_ax.imshow(img)
     robot.draw(map_ax, color="#00ff00")
-    map_ax.invert_yaxis()
-    
+    #map_ax.invert_yaxis()
+
     walkable_ax.clear()
-    walkable_ax.imshow(constructed_map.walkable(WALKABLE_MIN_RADIUS, height_px, width_px), cmap='gray')
-    walkable_ax.invert_yaxis()
-    
+    walkable_ax.imshow(constructed_map.walkable(
+        WALKABLE_MIN_RADIUS, height_px, width_px), cmap='gray')
+    #walkable_ax.invert_yaxis()
+
     fig.canvas.draw()
     fig.canvas.flush_events()
 
@@ -385,6 +464,10 @@ def on_send_instruction_button_clicked(event):
 
 def on_listen_button_clicked(event):
     action_listen()
+
+
+def on_scan_button_clicked(event):
+    action_scan()
 
 
 def on_restart_button_clicked(event):
@@ -405,13 +488,13 @@ def on_stg_button_clicked(event):
 
 if __name__ == '__main__':
 
-    width_mm = 640
-    height_mm = 480
-    cell_size_mm = 10
+    width_mm = 1000
+    height_mm = 1000
+    cell_size_mm = 20
     width_px = width_mm
     height_px = height_mm
-    
-    WALKABLE_MIN_RADIUS = EPuck2.Epuck.RADIUS_MM * 1.5
+
+    WALKABLE_MIN_RADIUS = EPuck2.Epuck.RADIUS_MM * 2
 
     robot = EPuck2.Epuck(x_mm=width_mm/2, y_mm=height_mm/2)
     current_move = Move()
@@ -436,7 +519,7 @@ if __name__ == '__main__':
     map_ax.set_title('Map')
     walkable_ax = fig.add_subplot(1, 2, 2)
     walkable_ax.set_title('Walkable')
-    
+
     for ax in (map_ax, walkable_ax):
         ax.set_aspect('equal', 'box')
         ax.set_xlim([0, width_mm])
@@ -447,13 +530,13 @@ if __name__ == '__main__':
     # Create figures and subplots
     #fig = plt.figure()
     #map_ax = fig.add_subplot()
-    #map_ax.set_title('Map')
+    # map_ax.set_title('Map')
     #map_ax.set_aspect('equal', 'box')
     #map_ax.set_xlim([0, width_mm])
     #map_ax.set_ylim([0, height_mm])
-    #map_ax.set_xlabel('millimeters')
-    #map_ax.set_ylabel('millimeters')
-    #plt.subplots_adjust(bottom=0.2)
+    # map_ax.set_xlabel('millimeters')
+    # map_ax.set_ylabel('millimeters')
+    # plt.subplots_adjust(bottom=0.2)
 
     # Create buttons
     button_color = 'lightgoldenrodyellow'
@@ -480,6 +563,8 @@ if __name__ == '__main__':
         [BUTTON_MARGIN + 5 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
     stg_button_ax = plt.axes(
         [BUTTON_MARGIN + 6 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+    scan_button_ax = plt.axes(
+        [BUTTON_MARGIN + 7 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 
     update_button = Button(update_button_ax, 'Update',
                            color=button_color, hovercolor=button_hovercolor)
@@ -495,6 +580,8 @@ if __name__ == '__main__':
                            color=button_color, hovercolor=button_hovercolor)
     stg_button = Button(stg_button_ax, 'STG',
                         color=button_color, hovercolor=button_hovercolor)
+    scan_button = Button(scan_button_ax, 'Scan',
+                         color=button_color, hovercolor=button_hovercolor)
 
     update_button.on_clicked(on_update_button_clicked)
     send_instruction_button.on_clicked(on_send_instruction_button_clicked)
@@ -503,18 +590,11 @@ if __name__ == '__main__':
     clear_button.on_clicked(on_clear_button_clicked)
     bezier_button.on_clicked(on_bezier_button_clicked)
     stg_button.on_clicked(on_stg_button_clicked)
+    scan_button.on_clicked(on_scan_button_clicked)
 
     # Connect events
     fig.canvas.mpl_connect('button_press_event', on_mouse_button_press)
     fig.canvas.mpl_connect('key_press_event', on_key_press)
-    
-    timer = fig.canvas.new_timer(interval=10)
-    timer.add_callback(construct_map)
-    timer.start()
-    
-    timer = fig.canvas.new_timer(interval=200)
-    timer.add_callback(update)
-    timer.start()
 
     # Start the matplotlib main
     plt.show()
