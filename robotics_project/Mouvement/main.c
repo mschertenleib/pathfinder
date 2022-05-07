@@ -14,6 +14,9 @@
 #include <msgbus/messagebus.h>
 #include <move.h>
 #include <audio/audio_thread.h>
+#include <odometrie.h>
+#include <listen.h>
+#include <sensors/VL53L0X/VL53L0X.h>
 
 messagebus_t bus;
 MUTEX_DECL(bus_lock);
@@ -54,21 +57,18 @@ int main(void) {
 	usb_start();
 	//starts timer 12
 	timer12_start();
-	//speaker thd start
-	//dac_start();
 	//inits the motors
 	motors_init();
 	//init move thread
 	lauch_move_thd();
+	VL53L0X_start();
+	lauch_odometrie_thd();
 
 	/* Infinite loop. */
-	volatile uint8_t l1;
 	while (1) {
 		
-		ReceiveSpeedInstMove(BTH,BTH);
-
-		chprintf(BTH,"Loop Main\r\n");
-
+		listen(BTH,BTH);
+		chprintf(BTH,"in Main\r\n");
 		chThdSleepMilliseconds(1000);
 	}
 }

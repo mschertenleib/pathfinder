@@ -1,10 +1,13 @@
 #include "ch.h"
 #include "hal.h"
 #include "leds.h"
-#include <main.h>
 #include <motors.h>
 #include <usbcfg.h>
 #include <chprintf.h>
+#include <sensors/VL53L0X/VL53L0X.h>
+
+#include <odometrie.h>
+#include <main.h>
 
 #include <move.h>
 
@@ -29,47 +32,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 	volatile uint16_t i=0;
 
 	if(!running_sequence){
-		set_body_led(1);
-		uint8_t state = 0;
-		while(state != 4){
-
-			l1 = chSequentialStreamGet(in);
-			chprintf(out,"ASCII %c, Hex %x, Dec %d.\r\n",l1,l1,l1);
-			//State machine to detect the string EOF\0S in order synchronize
-			//with the frame received
-			switch(state){
-				case 0:
-					if(l1 == 'M')
-						state = 1;
-					else
-						state = 0;
-				case 1:
-					if(l1 == 'O')
-						state = 2;
-					else if(l1 == 'M')
-						state = 1;
-					else
-						state = 0;
-				case 2:
-					if(l1 == 'V')
-						state = 3;
-					else if(l1 == 'M')
-						state = 1;
-					else
-						state = 0;
-				case 3:
-					if(l1 == 'E')
-						state = 4;
-					else if(l1 == 'M')
-						state = 1;
-					else
-						state = 0;
-			}
-			
-		}
-
-		chprintf(out,"INSTRUCTION MOVE\r\n");
-
+		set_body_led(0);
 		l1 = chSequentialStreamGet(in);
 		l2 = chSequentialStreamGet(in);
 
@@ -86,7 +49,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 			r1 = chSequentialStreamGet(in); //get first byte of rightspeed
 			if(l1 == 'E' && l2 == 'N' && r1 == 'D'){
 				i++;
-				chprintf(out,"STOP Detected after %d moves\r\n",i);
+				chprintf(out,"STOP Detected after %d moves\r\n",i-1);
 				break;
 			}
 			r2 = chSequentialStreamGet(in); //get second byte of rightspeed
@@ -110,7 +73,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 		chBSemSignal(&sequence_ready_sem);
 
 	}else{
-		chprintf(out,"cannot load sequence, main sequence being used %d \r\n",chSequentialStreamGet(in));
+		chprintf(out,"cannot load sequence, a sequence being used %d \r\n",chSequentialStreamGet(in));
 	}
 	set_body_led(0);
 }
@@ -124,7 +87,7 @@ static THD_FUNCTION(moveThread,arg){
 
 	while(TRUE){
 		chBSemWait(&sequence_ready_sem);
-
+		chThdSleepMilliseconds(500);
 		running_sequence = TRUE;
 		int16_t lspd = 0;
 		int16_t rspd = 0;
@@ -135,31 +98,51 @@ static THD_FUNCTION(moveThread,arg){
 			stime = move_sequence[(i*3)+2];
 			left_motor_set_speed(lspd);
 			right_motor_set_speed(rspd);
-			chprintf((BaseSequentialStream *) &SD3,"running %d L %d R %d for %d ms \r\n",i,lspd,rspd,stime);
+			//chprintf((BaseSequentialStream *) &SD3,"running %d L %d R %d for %d ms \r\n",i,lspd,rspd,stime);
 			chThdSleepMilliseconds(stime);
 		}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
+		//chprintf((BaseSequentialStream *) &SD3,"DONE\r\n");
 		chThdSleepMilliseconds(100);
-		chprintf((BaseSequentialStream *) &SD3,"DONE\r\n");
 		running_sequence = FALSE;
 		set_body_led(1);
 		chBSemReset(&sequence_ready_sem,TRUE);
 	}
 }
 
+void stop(BaseSequentialStream* out){
+	left_motor_set_speed(0);
+	right_motor_set_speed(0);
+	chprintf(out,"stopped.\r\n");
+}
+
+void scan(BaseSequentialStream* out){
+	set_body_led(0);
+	float ang = get_angle();
+	int16_t dist;
+	int turnspd = (int)(3.14159265359*RBTWIDTHCM*1000)/(13*secscan);
+	size_move = 1;
+	move_sequence[0] = turnspd;
+	move_sequence[1] = -turnspd;
+	move_sequence[2] = secscan*1000;
+	chBSemSignal(&sequence_ready_sem);
+	chprintf(out,"X%f Y%f P%f\r\n",get_posx(),get_posy(),get_angle());
+	while(!running_sequence){
+		chThdSleepMilliseconds(100);
+	}
+	while(running_sequence){
+		ang = get_angle();
+		dist = VL53L0X_get_dist_mm();
+		chprintf(out,"P%f D%i\r\n",ang,dist);
+		chThdSleepMilliseconds(TIMERES);
+	}
+}
+
 void lauch_move_thd(void){
 	chThdCreateStatic(moveThreadArea,
 							  sizeof(moveThreadArea),
-							  NORMALPRIO-1,
+							  NORMALPRIO+1,
 							  moveThread,
 							  NULL);
-}
-
-void RunSpeedInstSequence(){
-    if(!running_sequence){
-
-	}else{
-		chprintf((BaseSequentialStream *) &SDU1,"sequence already running\r\n");
-	}
 }

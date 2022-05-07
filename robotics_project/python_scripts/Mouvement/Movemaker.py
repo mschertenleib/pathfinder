@@ -20,7 +20,6 @@ original_stdout = sys.stdout
 instrfile = sys.argv[1][2:]
 APRPP = int(sys.argv[2])
 timecom = int(sys.argv[3])*1000
-print(timecom)
 
 ################################# Internal Functions ################################# 
 
@@ -100,23 +99,24 @@ class Move:
 
     def gen_stg_command(self,time):
         self.path.clear()
-        nbcom = (len(self.data)-1)*2
+        self.path = self.data.copy()
+        nbcom = (len(self.path)-1)*2
         tps = int(time/nbcom)
-        print(time,len(self.data),nbcom,tps)
+        print(time,len(self.path),nbcom,tps)
         self.command.clear()
 
-        for i in range(len(self.data)-1) : 
+        for i in range(len(self.path)-1) : 
             #turning phase
             if i == 0 :
-                alpha = angle_points([0,0],[0,1],self.data[0],self.data[1])
+                alpha = angle_points([0,0],[0,1],self.path[0],self.path[1])
             else:
-                alpha = angle_points(self.data[i-1],self.data[i],self.data[i],self.data[i+1])
+                alpha = angle_points(self.path[i-1],self.path[i],self.path[i],self.path[i+1])
             #print("angl %d : %2f"%(i,alpha*(180/np.pi)))
             l = int((((ESP_D/2)*alpha)*SPCM*1000)/tps)
             r = int((-((ESP_D/2)*alpha)*SPCM*1000)/tps)
             self.command.append([l,r,tps])
             #forward phase
-            spd = int((dist(self.data[i],self.data[i+1])*SPCM*1000)/tps)
+            spd = int((dist(self.path[i],self.path[i+1])*SPCM*1000)/tps)
             self.command.append([spd,spd,tps])
 
     def smooth_line(self):
@@ -131,7 +131,7 @@ class Move:
     def genfile(self,filename):
         f = open(filename, 'w')
         sys.stdout = f # Change the standard output to the file we created.
-        print('MOVE')
+        print('!MOVE')
         nb_word = len(self.command)*3
         print(nb_word)
 
@@ -222,23 +222,26 @@ def send_instr(file,port):
     ser.close()
 
 
-def listen_ser(port,time):
+def listen_ser(port,otime):
     print("Opening ",port," and reading :")
     ser = serial.Serial(port, 57600, timeout=1)
     if(not ser.is_open):
         ser.open()
     i = 0
-    while i < time:
+    f = open("pos.txt", 'w')
+    sys.stdout = f
+    while i < otime:
         bytesToRead = ser.inWaiting()
         serstr = ser.read(bytesToRead)
         if serstr != b'':
             i= 0
             ret = serstr.decode("ascii")
-            print("->",ret)
+            print(ret)
             if ret.find("DONE") != -1:
                 break
         else:
             i += 1
+    sys.stdout = original_stdout
     print("stopped listening.",i)
     ser.close()
 
@@ -294,6 +297,7 @@ def on_press(event):
 
 robot = EPuck2.Epuck(0,0,0)
 current_move = Move()
+current_move.data = [[0,0],[0,10],[10,10],[10,0]].copy()
 
 fig = plt.figure(figsize=(5,5),edgecolor="#000000",facecolor="#ffffff")
 
