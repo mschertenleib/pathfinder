@@ -31,6 +31,8 @@ instrfile = 'instructions.txt'  # sys.argv[1][2:]
 timecom = 1000  # int(sys.argv[3])*1000
 print(timecom)
 
+goal_mm = (0, 0)
+
 ################################# Internal Functions #################################
 
 
@@ -291,13 +293,10 @@ def read_robot_data(ser: serial.Serial, time):
 
 
 def on_mouse_button_press(event):
-    if not event.inaxes:
-        return
-
-    # if event.inaxes is map_ax:
-        # if event.button is MouseButton.LEFT:
-        #    x_mm, y_mm = event.xdata, event.ydata
-        #    constructed_map.set_occupied(x_mm, y_mm)
+    if event.inaxes is map_ax:
+        if event.button is MouseButton.LEFT:
+            global goal_mm
+            goal_mm = (event.xdata, event.ydata)
 
         # elif event.button is MouseButton.RIGHT:
         #    global ix, iy
@@ -324,10 +323,10 @@ def action_listen():
 def action_scan():
     ser = serial.Serial(com_port, 57600, timeout=5)
 
-    for c in '!SCAN':  # send instr like "MOVE"
+    for c in '!SCAN':
         ser.write(c.encode('utf-8'))
 
-    ser.write(struct.pack(">B", 2))
+    ser.write(struct.pack(">B", 5))
     
     data = read_robot_data(ser, 1e6)
     construct_from_read_scan(data)
@@ -425,30 +424,23 @@ def construct_map_generated():
 
 
 def update():
-    map_image = constructed_map.to_image(height=height_px, width=width_px)
+    map_image = constructed_map.as_image_with_walkable(WALKABLE_MIN_RADIUS, (255, 255, 0))
+    img = cv2.resize(map_image, dsize=(height_px, width_px), interpolation=cv2.INTER_NEAREST)
 
-    img = cv2.merge([map_image] * 3)
-
-    goal_mm = (width_mm//4, height_mm*5//6)
-    cv2.rectangle(img, goal_mm, np.add(
-        goal_mm, (cell_size_mm, cell_size_mm)), (1, 0, 0))
+    center = (int(goal_mm[0] + cell_size_mm / 2), int(goal_mm[1] + cell_size_mm / 2))
+    cv2.circle(img, center, cell_size_mm // 2, (255, 0, 0), 2)
     path = constructed_map.find_path(
         (robot.x_mm, robot.y_mm), goal_mm, WALKABLE_MIN_RADIUS)
     if len(path) >= 2:
         for i in range(len(path)-1):
             start = (int(path[i][0]), int(path[i][1]))
             end = (int(path[i+1][0]), int(path[i+1][1]))
-            cv2.line(img, start, end, (0, 0, 1))
+            cv2.line(img, start, end, (0, 0, 255), 2)
 
     map_ax.clear()
     map_ax.imshow(img)
     robot.draw(map_ax, color="#00ff00")
     #map_ax.invert_yaxis()
-
-    walkable_ax.clear()
-    walkable_ax.imshow(constructed_map.walkable(
-        WALKABLE_MIN_RADIUS, height_px, width_px), cmap='gray')
-    #walkable_ax.invert_yaxis()
 
     fig.canvas.draw()
     fig.canvas.flush_events()
@@ -488,8 +480,8 @@ def on_stg_button_clicked(event):
 
 if __name__ == '__main__':
 
-    width_mm = 1000
-    height_mm = 1000
+    width_mm = 800
+    height_mm = 800
     cell_size_mm = 20
     width_px = width_mm
     height_px = height_mm
@@ -515,28 +507,14 @@ if __name__ == '__main__':
 
     # Create figures and subplots
     fig = plt.figure()
-    map_ax = fig.add_subplot(1, 2, 1)
+    map_ax = fig.add_subplot()
     map_ax.set_title('Map')
-    walkable_ax = fig.add_subplot(1, 2, 2)
-    walkable_ax.set_title('Walkable')
-
-    for ax in (map_ax, walkable_ax):
-        ax.set_aspect('equal', 'box')
-        ax.set_xlim([0, width_mm])
-        ax.set_ylim([0, height_mm])
-        ax.set_xlabel('millimeters')
-        ax.set_ylabel('millimeters')
-
-    # Create figures and subplots
-    #fig = plt.figure()
-    #map_ax = fig.add_subplot()
-    # map_ax.set_title('Map')
-    #map_ax.set_aspect('equal', 'box')
-    #map_ax.set_xlim([0, width_mm])
-    #map_ax.set_ylim([0, height_mm])
-    # map_ax.set_xlabel('millimeters')
-    # map_ax.set_ylabel('millimeters')
-    # plt.subplots_adjust(bottom=0.2)
+    map_ax.set_aspect('equal', 'box')
+    map_ax.set_xlim([0, width_mm])
+    map_ax.set_ylim([0, height_mm])
+    map_ax.set_xlabel('millimeters')
+    map_ax.set_ylabel('millimeters')
+    plt.subplots_adjust(bottom=0.2)
 
     # Create buttons
     button_color = 'lightgoldenrodyellow'

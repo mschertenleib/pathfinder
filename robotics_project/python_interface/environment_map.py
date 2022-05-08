@@ -1,3 +1,4 @@
+from configparser import Interpolation
 import numpy as np
 import cv2
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -371,6 +372,8 @@ class Environment_map:
         sin_angle = np.sin(robot_angle_rad)
         tof_x_mm = robot_pos_mm[0] + tof_sensor_offset_mm * cos_angle
         tof_y_mm = robot_pos_mm[1] + tof_sensor_offset_mm * sin_angle
+        
+        line_thickness = 2
 
         if tof_distance_mm < tof_max_distance_mm:  # We detected an obstacle
 
@@ -379,61 +382,56 @@ class Environment_map:
 
             # Free line of sight
             self.__sample_free_line(
-                (tof_x_mm, tof_y_mm), (obstacle_x_mm, obstacle_y_mm))
+                (tof_x_mm, tof_y_mm), (obstacle_x_mm, obstacle_y_mm), line_thickness)
 
             if self.__point_mm_is_in_grid((obstacle_x_mm, obstacle_y_mm)):
                 wall_x_index = self.__val_mm_to_index(obstacle_x_mm)
                 wall_y_index = self.__val_mm_to_index(obstacle_y_mm)
                 # We already counted a free sample in the obstacle cell by calling __sample_free_line
-                self.free_samples[wall_y_index][wall_x_index] -= 1
+                point_to_remove = np.zeros((self.height, self.width))
+                cv2.circle(img=point_to_remove, center=(wall_x_index, wall_y_index), radius=line_thickness//2, color=1, thickness=-1)
+                self.free_samples = cv2.subtract(self.free_samples, point_to_remove)
+                #self.free_samples[wall_y_index][wall_x_index] -= 1
 
         else:
             line_end_x_mm = tof_x_mm + tof_max_distance_mm * cos_angle
             line_end_y_mm = tof_y_mm + tof_max_distance_mm * sin_angle
             # Free line of sight
             self.__sample_free_line(
-                (tof_x_mm, tof_y_mm), (line_end_x_mm, line_end_y_mm))
+                (tof_x_mm, tof_y_mm), (line_end_x_mm, line_end_y_mm), line_thickness)
 
         self.__update_cells()
-
-    def to_image(self, height, width):
+    
+    def as_image(self):
         """
-        Returns a (height, width) grayscale numpy image of the map. The origin is in the upper left corner
-
-        Parameters:
-        ---
-        height:
-            The height of the image in pixels
-        width:
-            The width of the image in pixels
-
+        Get a grayscale image of the map, as a numpy uint8 array
+        
         Returns
         ---
         The image
         """
+        
+        return (self.cells * 255).astype(np.uint8)
 
-        return cv2.resize(src=self.cells, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
-
-    def walkable(self, radius_mm, height, width):
+    def as_image_with_walkable(self, walkable_mm, walkable_color):
         """
-        Returns a (height, width) numpy image of the cells of the map that are at least radius_mm millimeters from any obstacle. A 1 (white) represents a valid cell, a 0 (black) represents an invalid cell
-
-        Parameters:
+        Get a color image of the map with the walkable cells, as a numpy uint8 array
+        
+        Parameters
         ---
-        radius_mm:
-            The required minimum distance from any obstacle in millimeters
-        height:
-            The height of the image in pixels
-        width:
-            The width of the image in pixels
-
+        walkable_mm:
+            The minimum distance in millimeters to keep to any obstacle when computing the walkable cells
+        walkable_color:
+            A uint8 3-tuple representing the color of the walkable cells
+        
         Returns
         ---
         The image
         """
-
-        walkable = self.__walkable(radius_mm)
-        return cv2.resize(src=walkable, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
+        
+        map_bgr = cv2.merge([self.as_image()] * 3)
+        walkable_mask = cv2.merge([self.__walkable(walkable_mm)] * 3)
+        return np.where(walkable_mask > 0, np.array(walkable_color).astype(np.uint8), map_bgr)
 
     def find_path(self, start_mm, goal_mm, radius_mm):
         """
@@ -456,8 +454,7 @@ class Environment_map:
         start = self.__point_mm_to_index(start_mm)
         goal = self.__point_mm_to_index(goal_mm)
         path = self.__find_path(start, goal, radius_mm)
-        path = [self.__index_to_point_mm(x, y) for x, y in path]
-        return path
+        return [self.__index_to_point_mm(x, y) for x, y in path]
 
     def robot_data_generator(self, tof_sensor_offset_mm, tof_max_distance_mm, add_uncertainty=False):
         """
@@ -635,7 +632,7 @@ class Environment_map:
 
         return self.__index_to_val_mm(index_x), self.__index_to_val_mm(index_y)
 
-    def __sample_free_line(self, pt1_mm, pt2_mm):
+    def __sample_free_line(self, pt1_mm, pt2_mm, thickness=1):
         """
         Updates the samples with a free line from pt1_mm to pt2_mm
 
@@ -645,13 +642,15 @@ class Environment_map:
             The starting (x, y) point in millimeters
         pt2_mm:
             The ending (x, y) point in millimeters
+        thickness:
+            The thickness of the line in cells
         """
 
         pt1 = self.__point_mm_to_index(pt1_mm)
         pt2 = self.__point_mm_to_index(pt2_mm)
 
         line_to_add = np.zeros((self.height, self.width))
-        cv2.line(img=line_to_add, pt1=pt1, pt2=pt2, color=1, thickness=2)
+        cv2.line(img=line_to_add, pt1=pt1, pt2=pt2, color=1, thickness=thickness)
 
         self.free_samples = cv2.add(self.free_samples, line_to_add)
         self.total_samples = cv2.add(self.total_samples, line_to_add)
@@ -671,7 +670,7 @@ class Environment_map:
 
     def __walkable(self, radius_mm):
         """
-        Returns a numpy grid of the cells of the map that are at least radius_mm millimeters from any obstacle. A 1 (white) represents a valid cell, a 0 (black) represents an invalid cell
+        Returns an integer numpy grid of the cells of the map that are at least radius_mm millimeters from any obstacle. A 1 represents a valid cell, a 0 represents an invalid cell
 
         Parameters:
         ---
@@ -682,15 +681,17 @@ class Environment_map:
         ---
             The grid
         """
-
-        kernel = disk_kernel(self.__val_mm_to_index(radius_mm))
+        
         # An obstacle is a positive value, a free cell is a 0
-        obstacles = np.ones((self.height, self.width))
+        obstacles = np.ones((self.height, self.width), dtype=int)
         obstacles[self.cells > self.__FREE_THRESHOLD] = 0
         cv2.rectangle(obstacles, (0, 0), (self.width - 1, self.height - 1), 1)
-        filtered = cv2.filter2D(src=obstacles, ddepth=-1, kernel=kernel)
+        
+        kernel = disk_kernel(self.__val_mm_to_index(radius_mm)).astype(float)
+        filtered = cv2.filter2D(src=obstacles.astype(float), ddepth=-1, kernel=kernel)
+        
         walkable_grid = 1 - np.clip(filtered, 0, 1)
-        return walkable_grid
+        return walkable_grid.astype(int)
 
     def __find_path(self, start_coords, goal_coords, radius_mm):
         """
@@ -734,7 +735,7 @@ def disk_kernel(radius):
     """
 
     kernel_size = 2 * radius + 1
-    kernel = np.zeros((kernel_size, kernel_size))
+    kernel = np.zeros((kernel_size, kernel_size), dtype=int)
     for x in range(0, kernel_size):
         delta_y = int(np.sqrt(radius * radius - (x - radius) * (x - radius)))
         for y in range(radius - delta_y, radius + delta_y + 1):
