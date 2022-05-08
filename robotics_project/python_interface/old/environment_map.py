@@ -346,7 +346,7 @@ class Environment_map:
 
         return max_distance_mm
 
-    def construct(self, robot_pos_mm, robot_angle_rad, robot_radius_mm, tof_distance_mm, tof_sensor_offset_mm, tof_max_distance_mm, line_thickness=1):
+    def construct(self, robot_pos_mm, robot_angle_rad, robot_radius_mm, tof_distance_mm, tof_sensor_offset_mm, tof_max_distance_mm):
         """
         Construct a part of the map
 
@@ -364,8 +364,6 @@ class Environment_map:
             The distance from the center of the robot to the TOF in millimeters
         tof_max_distance_mm:
             The maximum distance measurable by the TOF sensor in millimeters
-        line_thickness:
-            The thickness of the sampling line, in cells
         """
 
         # Free disk where the robot is located
@@ -375,16 +373,36 @@ class Environment_map:
         sin_angle = np.sin(robot_angle_rad)
         tof_x_mm = robot_pos_mm[0] + tof_sensor_offset_mm * cos_angle
         tof_y_mm = robot_pos_mm[1] + tof_sensor_offset_mm * sin_angle
+        
+        line_thickness = 1
+        radius = 2
 
         if tof_distance_mm < tof_max_distance_mm:  # We detected an obstacle
+
             obstacle_x_mm = tof_x_mm + tof_distance_mm * cos_angle
             obstacle_y_mm = tof_y_mm + tof_distance_mm * sin_angle
-            self.__sample_free_line_and_obstacle(
+
+            # Free line of sight
+            self.__sample_free_line(
                 (tof_x_mm, tof_y_mm), (obstacle_x_mm, obstacle_y_mm), line_thickness)
+
+            if self.__point_mm_is_in_grid((obstacle_x_mm, obstacle_y_mm)):
+                wall_x_index = self.__val_mm_to_index(obstacle_x_mm)
+                wall_y_index = self.__val_mm_to_index(obstacle_y_mm)
+                # We already counted a free sample in the obstacle cell by calling __sample_free_line
+                point_to_remove = np.zeros((self.height, self.width))
+                cv2.circle(img=point_to_remove, center=(wall_x_index, wall_y_index), radius=radius, color=1, thickness=-1)
+                
+                # TODO: idea: if we hit an obstacle draw a full line for total_samples, and a partial line for free_samples
+                # NOTE: we HAVE to use np.uint8 for AA
+                
+                self.free_samples = cv2.subtract(self.free_samples, point_to_remove)
+                #self.free_samples[wall_y_index][wall_x_index] -= 1
 
         else:
             line_end_x_mm = tof_x_mm + tof_max_distance_mm * cos_angle
             line_end_y_mm = tof_y_mm + tof_max_distance_mm * sin_angle
+            # Free line of sight
             self.__sample_free_line(
                 (tof_x_mm, tof_y_mm), (line_end_x_mm, line_end_y_mm), line_thickness)
 
@@ -466,7 +484,7 @@ class Environment_map:
         while(True):
 
             robot_angle_rad = i * 1 / 360 * 2 * np.pi
-            robot_x_mm = self.width_mm * (0.4 + 0.2 * np.sin(robot_angle_rad*0.7))
+            robot_x_mm = self.width_mm / 2 #* (0.4 + 0.2 * np.sin(robot_angle_rad*0.7))
             robot_y_mm = self.height_mm / 2
 
             start_x_mm = robot_x_mm + \
@@ -618,6 +636,28 @@ class Environment_map:
         """
 
         return self.__index_to_val_mm(index_x), self.__index_to_val_mm(index_y)
+
+    def __sample_line(self, mat, pt1_index, pt2_index, thickness=1):
+        """
+        Updates mat with a line of 1's from pt1_index to pt2_index
+
+        Parameters:
+        ---
+        mat:
+            The sample array to update
+        pt1_index:
+            The starting (x, y) point coordinates
+        pt2_index:
+            The ending (x, y) point coordinates
+        thickness:
+            The thickness of the line in cells
+        """
+
+        # Create an antialiased line image
+        line_to_add = np.zeros((self.height, self.width), dtype=np.uint8)
+        cv2.line(img=line_to_add, pt1=pt1_index, pt2=pt2_index, color=255, thickness=thickness, lineType=cv2.LINE_AA)
+        
+        mat = cv2.add(mat, line_to_add.astype(float) / 255)
     
     def __sample_free_line(self, pt1_mm, pt2_mm, thickness=1):
         """
@@ -635,14 +675,8 @@ class Environment_map:
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
         pt2_index = self.__point_mm_to_index(pt2_mm)
-        
-        # Line image as np.uint8 for anti-aliasing to work
-        line_to_add = np.zeros((self.height, self.width), dtype=np.uint8)
-        cv2.line(img=line_to_add, pt1=pt1_index, pt2=pt2_index, color=255, thickness=thickness, lineType=cv2.LINE_AA)
-        line_to_add_float = line_to_add.astype(float) / 255
-        
-        self.free_samples = cv2.add(self.free_samples, line_to_add_float)
-        self.total_samples = cv2.add(self.total_samples, line_to_add_float)
+        self.__sample_line(self.free_samples, pt1_index, pt2_index, thickness)
+        self.__sample_line(self.total_samples, pt1_index, pt2_index, thickness)
     
     def __sample_free_line_and_obstacle(self, pt1_mm, pt2_mm, thickness=1):
         """
@@ -660,22 +694,10 @@ class Environment_map:
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
         pt2_index = self.__point_mm_to_index(pt2_mm)
-        
-        # Add a full line to total_samples
-        line_to_add = np.zeros((self.height, self.width), dtype=np.uint8)
-        cv2.line(img=line_to_add, pt1=pt1_index, pt2=pt2_index, color=255, thickness=thickness, lineType=cv2.LINE_AA)
-        self.total_samples = cv2.add(self.total_samples, line_to_add.astype(float) / 255)
-        
-        # Remove the tip of the line before adding to free_samples
-        #line_vector = np.subtract(pt2_index, pt1_index)
-        #delta = line_vector / np.linalg.norm(line_vector) * thickness
-        #line_mask_center = np.add(pt2_index, (int(delta[0]), int(delta[1])))
-        #line_mask_pt1 = np.add(line_mask_center, (line_vector[1], -line_vector[0]))
-        #line_mask_pt2 = np.subtract(line_mask_center, (line_vector[1], -line_vector[0]))
-        #cv2.line(img=line_to_add, pt1=line_mask_pt1, pt2=line_mask_pt2, color=0, thickness=thickness)
-        cv2.circle(img=line_to_add, center=pt2_index, radius=thickness, color=0, thickness=-1)
-        self.free_samples = cv2.add(self.free_samples, line_to_add.astype(float) / 255)
-        
+        delta = np.subtract(pt2_index, pt1_index)
+        free_line_ending = pt2_index - delta / np.linalg.norm(delta)
+        self.__sample_line(self.free_samples, pt1_index, free_line_ending, thickness)
+        self.__sample_line(self.total_samples, pt1_index, pt2_index, thickness)
 
     def __update_cells(self):
         """

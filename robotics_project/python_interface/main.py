@@ -343,12 +343,8 @@ def construct_from_read_scan(data):
 
     x_str, y_str, angle_str = lines[1].split(' ')
     x_mm, y_mm, angle_rad = float(x_str[1:]) * 10, float(y_str[1:]) * 10, float(angle_str[1:])
-    
-    #angle_rad = np.pi / 2 - angle_rad
 
     for string_line in lines[2:len(lines)-3]:
-        print('Line:', string_line)
-        
         if not string_line:
             return
 
@@ -368,7 +364,6 @@ def convert_read_scan_to_x_y_angle_dist(x_mm, y_mm, data: str):
     angle_str, distance_str = data.split(' ')
     angle_rad = float(angle_str[1:])
     distance_mm = float(distance_str[1:])
-    print('Converted', angle_rad, distance_mm)
     return (x_mm, y_mm, angle_rad, distance_mm)
 
 
@@ -482,7 +477,8 @@ if __name__ == '__main__':
 
     width_mm = 800
     height_mm = 800
-    cell_size_mm = 20
+    # FIXME: filtering
+    cell_size_mm = 10
     width_px = width_mm
     height_px = height_mm
 

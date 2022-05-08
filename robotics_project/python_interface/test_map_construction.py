@@ -1,25 +1,17 @@
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
-import serial
-import struct
-import sys
 import environment_map as envmap
 import EPuck2
-
-
-def draw_robot(img, robot_x_mm, robot_y_mm, robot_angle_rad, robot_radius_mm, color):
-    cv2.circle(img, (int(robot_x_mm), int(robot_y_mm)),
-               int(robot_radius_mm), color, 2)
-    cv2.line(img, (int(robot_x_mm), int(robot_y_mm)), (int(robot_x_mm + robot_radius_mm *
-             np.cos(robot_angle_rad)), int(robot_y_mm + robot_radius_mm * np.sin(robot_angle_rad))), color, 2)
 
 
 def main():
 
     width_mm = 800
     height_mm = 800
-    cell_size_mm = 20
+    cell_size_mm = 10
+    
+    #FIXME: the kernel problem comes from the usage of int, it should be u8, u16, f32 or f64
+    
     ROBOT_RADIUS_MM = EPuck2.Epuck.RADIUS_MM
     TOF_SENSOR_OFFSET_MM = EPuck2.Epuck.TOF_SENSOR_OFFSET_MM
     TOF_MAX_DISTANCE_MM = EPuck2.Epuck.TOF_MAX_DISTANCE_MM
@@ -39,8 +31,8 @@ def main():
         width_mm=width_mm, height_mm=height_mm, cell_size_mm=cell_size_mm)
 
     data_generator = true_map.robot_data_generator(
-        TOF_SENSOR_OFFSET_MM, TOF_MAX_DISTANCE_MM, True)
-    
+        TOF_SENSOR_OFFSET_MM, TOF_MAX_DISTANCE_MM)#, True)
+
     WALKABLE_COLOR = (255, 255, 0)
     ROBOT_COLOR = (0, 255, 0)
     GOAL_COLOR = (255, 0, 0)
@@ -53,15 +45,26 @@ def main():
 
         constructed_map.construct((robot_x_mm, robot_y_mm), robot_angle_rad,
                                   ROBOT_RADIUS_MM, distance_mm, TOF_SENSOR_OFFSET_MM, TOF_MAX_DISTANCE_MM)
-        
-        map_bgr = constructed_map.as_image_with_walkable(WALKABLE_MM, WALKABLE_COLOR)
-        map_bgr = cv2.resize(map_bgr, dsize=(width_px, height_px), interpolation=cv2.INTER_NEAREST)
 
-        draw_robot(map_bgr, robot_x_mm, robot_y_mm, robot_angle_rad,
-                   ROBOT_RADIUS_MM, ROBOT_COLOR)
+        map_bgr = constructed_map.as_image_with_walkable(
+            WALKABLE_MM, WALKABLE_COLOR)
+        map_bgr = cv2.resize(map_bgr, dsize=(
+            width_px, height_px), interpolation=cv2.INTER_NEAREST)
 
+        # Draw robot
+        center_mm = (int(robot_x_mm + cell_size_mm / 2),
+                     int(robot_y_mm + cell_size_mm / 2))
+        front_mm = (int(center_mm[0] + ROBOT_RADIUS_MM * np.cos(robot_angle_rad)),
+                    int(center_mm[1] + ROBOT_RADIUS_MM * np.sin(robot_angle_rad)))
+        cv2.circle(map_bgr, center_mm, int(ROBOT_RADIUS_MM), ROBOT_COLOR, 2)
+        cv2.line(map_bgr, center_mm, front_mm, ROBOT_COLOR, 2)
+
+        # Draw goal
         goal_mm = (int(width_mm * 0.25), int(height_mm * 0.75))
-        cv2.circle(map_bgr, np.add(goal_mm, (cell_size_mm // 2, cell_size_mm // 2)), cell_size_mm // 2, GOAL_COLOR, 2)
+        cv2.circle(map_bgr, np.add(goal_mm, (cell_size_mm // 2,
+                   cell_size_mm // 2)), cell_size_mm // 2, GOAL_COLOR, 2)
+        
+        # Draw path
         path = constructed_map.find_path(
             (robot_x_mm, robot_y_mm), goal_mm, WALKABLE_MM)
         if len(path) >= 2:
@@ -69,7 +72,7 @@ def main():
                 start = (int(path[i][0]), int(path[i][1]))
                 end = (int(path[i + 1][0]), int(path[i + 1][1]))
                 cv2.line(map_bgr, start, end, PATH_COLOR, 2)
-        
+
         cv2.imshow('Constructed map', map_bgr)
 
         k = cv2.waitKey(1)
