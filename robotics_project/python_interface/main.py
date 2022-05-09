@@ -29,7 +29,6 @@ com_port = 'COM15'
 instrfile = 'instructions.txt'  # sys.argv[1][2:]
 #APRPP = int(sys.argv[2])
 timecom = 1000  # int(sys.argv[3])*1000
-print(timecom)
 
 goal_mm = (0, 0)
 
@@ -478,7 +477,7 @@ if __name__ == '__main__':
     width_mm = 800
     height_mm = 800
     # FIXME: filtering
-    cell_size_mm = 10
+    cell_size_mm = 20
     width_px = width_mm
     height_px = height_mm
 

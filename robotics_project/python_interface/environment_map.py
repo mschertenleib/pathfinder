@@ -705,7 +705,7 @@ class Environment_map:
         """
         
         # An obstacle is a positive value, a free cell is a 0
-        obstacles = np.ones((self.height, self.width), dtype=int)
+        obstacles = np.ones((self.height, self.width))
         obstacles[self.cells > self.__FREE_THRESHOLD] = 0
         cv2.rectangle(obstacles, (0, 0), (self.width - 1, self.height - 1), 1)
         
@@ -713,7 +713,7 @@ class Environment_map:
         filtered = cv2.filter2D(src=obstacles, ddepth=-1, kernel=kernel)
         
         walkable_grid = 1 - np.clip(filtered, 0, 1)
-        return walkable_grid.astype(int)
+        return walkable_grid.astype(np.uint8)
 
     def __find_path(self, start_coords, goal_coords, radius_mm):
         """
@@ -757,7 +757,7 @@ def disk_kernel(radius):
     """
 
     kernel_size = 2 * radius + 1
-    kernel = np.zeros((kernel_size, kernel_size), dtype=int)
+    kernel = np.zeros((kernel_size, kernel_size))
     for x in range(0, kernel_size):
         delta_y = int(np.sqrt(radius * radius - (x - radius) * (x - radius)))
         for y in range(radius - delta_y, radius + delta_y + 1):
