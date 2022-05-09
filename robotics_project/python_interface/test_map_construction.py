@@ -8,7 +8,7 @@ def main():
 
     width_mm = 800
     height_mm = 800
-    cell_size_mm = 20
+    cell_size_mm = 10
     
     ROBOT_RADIUS_MM = EPuck2.Epuck.RADIUS_MM
     TOF_SENSOR_OFFSET_MM = EPuck2.Epuck.TOF_SENSOR_OFFSET_MM

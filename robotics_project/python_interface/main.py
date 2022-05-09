@@ -10,8 +10,6 @@ import sys
 import numpy as np
 from matplotlib.widgets import Button
 import matplotlib.pyplot as plt
-import matplotlib.units as units
-from multiprocessing.connection import wait
 import matplotlib
 matplotlib.use('TkAgg')
 
@@ -297,17 +295,16 @@ def on_mouse_button_press(event):
             global goal_mm
             goal_mm = (event.xdata, event.ydata)
 
-        # elif event.button is MouseButton.RIGHT:
-        #    global ix, iy
-        #    ix, iy = event.xdata, event.ydata
-        #    print('x = %.2f, y = %.2f' % (ix, iy))
-        #    current_move.data.append([ix, iy])
-        #    x = []
-        #    y = []
-        #    for point in current_move.data:
-        #        x.append(point[0])
-        #        y.append(point[1])
-        #    map_ax.plot(x, y, c="#00ff55")
+        elif event.button is MouseButton.RIGHT:
+            ix, iy = event.xdata, event.ydata
+            print('x = %.2f, y = %.2f' % (ix, iy))
+            current_move.data.append([ix / 10, iy / 10])
+            x = []
+            y = []
+            for point in current_move.data:
+                x.append(point[0]*10)
+                y.append(point[1]*10)
+            map_ax.plot(x, y, c="#00ff55")
 
 
 def action_send_instruction():
@@ -351,7 +348,7 @@ def construct_from_read_scan(data):
             x_mm, y_mm, string_line)
         robot.set(x_mm, y_mm, angle_rad)
         constructed_map.construct((x_mm, y_mm), angle_rad, EPuck2.Epuck.RADIUS_MM, distance_mm,
-                                  EPuck2.Epuck.TOF_SENSOR_OFFSET_MM, EPuck2.Epuck.TOF_MAX_DISTANCE_MM)
+                                  EPuck2.Epuck.TOF_SENSOR_OFFSET_MM, EPuck2.Epuck.TOF_MAX_DISTANCE_MM, line_thickness)
         update()
     
     if lines[len(lines)-2].find('MAP') == -1:
@@ -392,6 +389,21 @@ def action_stg():
     # print(current_move.command)
     current_move.genfile(instrfile)
 
+def action_shortest_path():
+    print('Generating shortest path command')
+    
+    path = constructed_map.find_path((robot.x_mm, robot.y_mm), goal_mm, WALKABLE_MIN_RADIUS)
+    print('test')
+    if len(path) >= 2:
+        for px_mm, py_mm in path:
+            current_move.data.append([px_mm / 10, py_mm / 10])
+
+        current_move.gen_stg_command(timecom)
+        print('current_move:', current_move.command)
+        current_move.genfile(instrfile)
+    else:
+        print('No path found')
+
 
 def on_key_press(event):
     print('Pressed', event.key)
@@ -408,13 +420,6 @@ def on_key_press(event):
         action_bezier()
     elif event.key == 'n':
         action_stg()
-
-
-def construct_map_generated():
-    robot_x_mm, robot_y_mm, robot_angle_rad, distance_mm = next(data_generator)
-    robot.set(robot_x_mm, robot_y_mm, robot_angle_rad)
-    constructed_map.construct((robot_x_mm, robot_y_mm), robot_angle_rad, EPuck2.Epuck.RADIUS_MM,
-                              distance_mm, EPuck2.Epuck.TOF_SENSOR_OFFSET_MM, EPuck2.Epuck.TOF_MAX_DISTANCE_MM)
 
 
 def update():
@@ -472,33 +477,27 @@ def on_stg_button_clicked(event):
     action_stg()
 
 
+def on_shortest_path_button_clicked(event):
+    action_shortest_path()
+
+
 if __name__ == '__main__':
 
-    width_mm = 800
-    height_mm = 800
-    # FIXME: filtering
+    width_mm = 600
+    height_mm = 600
     cell_size_mm = 20
     width_px = width_mm
     height_px = height_mm
+    
+    line_thickness = 1
 
     WALKABLE_MIN_RADIUS = EPuck2.Epuck.RADIUS_MM * 2
 
-    robot = EPuck2.Epuck(x_mm=width_mm/2, y_mm=height_mm/2)
+    robot = EPuck2.Epuck(x_mm=width_mm/2, y_mm=height_mm/2, angle_rad=np.pi/4)
     current_move = Move()
-
-    true_map = envmap.Environment_map(width_mm, height_mm, cell_size_mm=1)
-    true_map.set_all_free()
-    true_map.set_occupied_line_normalized((0.2, 0.3), (0.8, 0.1))
-    true_map.set_occupied_line_normalized((0.5, 0.7), (0.8, 0.7))
-    true_map.set_occupied_line_normalized((0.1, 0.1), (0.1, 0.9))
-    true_map.set_occupied_line_normalized((0.7, 0.3), (0.7, 0.7))
-    true_map.set_occupied_rectangle_normalized((0.38, 0.65), (0.4, 1))
 
     constructed_map = envmap.Environment_map(
         width_mm=width_mm, height_mm=height_mm, cell_size_mm=cell_size_mm)
-
-    data_generator = true_map.robot_data_generator(
-        EPuck2.Epuck.TOF_SENSOR_OFFSET_MM, EPuck2.Epuck.TOF_MAX_DISTANCE_MM, True)
 
     # Create figures and subplots
     fig = plt.figure()
@@ -516,11 +515,11 @@ if __name__ == '__main__':
     button_hovercolor = '0.975'
 
     BUTTON_Y = 0.025
-    BUTTON_WIDTH = 0.1
     BUTTON_HEIGHT = 0.04
-    BUTTON_MARGIN = 0.02
-    NUM_BUTTONS = 7
-    BUTTON_SPACING = BUTTON_WIDTH + BUTTON_MARGIN
+    NUM_BUTTONS = 9
+    BUTTON_MARGIN = 0.01
+    BUTTON_SPACING = (1 - BUTTON_MARGIN) / NUM_BUTTONS
+    BUTTON_WIDTH = BUTTON_SPACING - BUTTON_MARGIN
 
     update_button_ax = plt.axes(
         [BUTTON_MARGIN, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
@@ -538,6 +537,8 @@ if __name__ == '__main__':
         [BUTTON_MARGIN + 6 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
     scan_button_ax = plt.axes(
         [BUTTON_MARGIN + 7 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+    shortest_path_button_ax = plt.axes(
+        [BUTTON_MARGIN + 8 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 
     update_button = Button(update_button_ax, 'Update',
                            color=button_color, hovercolor=button_hovercolor)
@@ -555,6 +556,8 @@ if __name__ == '__main__':
                         color=button_color, hovercolor=button_hovercolor)
     scan_button = Button(scan_button_ax, 'Scan',
                          color=button_color, hovercolor=button_hovercolor)
+    shortest_path_button = Button(shortest_path_button_ax, 'Path',
+                         color=button_color, hovercolor=button_hovercolor)
 
     update_button.on_clicked(on_update_button_clicked)
     send_instruction_button.on_clicked(on_send_instruction_button_clicked)
@@ -564,6 +567,7 @@ if __name__ == '__main__':
     bezier_button.on_clicked(on_bezier_button_clicked)
     stg_button.on_clicked(on_stg_button_clicked)
     scan_button.on_clicked(on_scan_button_clicked)
+    shortest_path_button.on_clicked(on_shortest_path_button_clicked)
 
     # Connect events
     fig.canvas.mpl_connect('button_press_event', on_mouse_button_press)

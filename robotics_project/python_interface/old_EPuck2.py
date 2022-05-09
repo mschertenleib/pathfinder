@@ -19,16 +19,21 @@ class Epuck2:
         self.x_mm = x_mm
         self.y_mm = y_mm
         self.angle_rad = angle_rad
-        self.trail = [(self.x_mm, self.y_mm, self.angle_rad)]
+        self.trail = []
 
-    def is_speed_valid(self, steps_per_second):
+    def set(self, x_mm, y_mm, angle_rad):
+        self.x_mm = x_mm
+        self.y_mm = y_mm
+        self.angle_rad = angle_rad
+        self.trail.clear()
+
+    def check_speed(self, steps_per_second):
         return abs(steps_per_second) <= self.MAX_STEPS_PER_SECOND
 
     def draw(self, ax, color):
 
         # Draw outer circle
-        points_per_circle = 100
-        angles_rad = np.linspace(0, 2 * np.pi, points_per_circle)
+        angles_rad = np.linspace(0, 2*np.pi, 100)
         px_mm = self.x_mm + self.RADIUS_MM * np.cos(angles_rad)
         py_mm = self.y_mm + self.RADIUS_MM * np.sin(angles_rad)
         ax.plot(px_mm, py_mm, color=color)
@@ -96,40 +101,44 @@ class Epuck2:
             ys_mm.append(y_mm)
         ax.plot(xs_mm, ys_mm, color=color)
 
-    def move_steps(self, steps_left, steps_right):
+    def move(self, steps_per_second_left, steps_per_second_right, ms):
+        SCALE_FACTOR = self.MM_PER_STEP / 1000  # scale from steps/s to mm/ms
+        mm_per_ms_left = steps_per_second_left * SCALE_FACTOR
+        mm_per_ms_right = steps_per_second_right * SCALE_FACTOR
 
-        distance_left_mm = steps_left * self.MM_PER_STEP
-        distance_right_mm = steps_right * self.MM_PER_STEP
-
-        if distance_left_mm == distance_right_mm:
-            self.x_mm += distance_left_mm * np.cos(self.angle_rad)
-            self.y_mm += distance_left_mm * np.sin(self.angle_rad)
-            self.trail.append((self.x_mm, self.y_mm, self.angle_rad))
-
+        if mm_per_ms_right == 0 or mm_per_ms_left == 0:
+            ratio = 2
         else:
-            turn_radius_mm = 0.5 * (distance_left_mm + distance_right_mm) / (distance_right_mm - distance_left_mm) * self.WHEEL_SPACING_MM
-            turn_angle_rad = (distance_right_mm - distance_left_mm) / self.WHEEL_SPACING_MM
-            start_angle = self.angle_rad
-            end_angle = start_angle + turn_angle_rad
-            turn_center_x_mm = self.x_mm - turn_radius_mm * np.sin(self.angle_rad)
-            turn_center_y_mm = self.y_mm + turn_radius_mm * np.cos(self.angle_rad)
-            points_per_circle = 100
-            num_points = int(abs(turn_angle_rad / (2 * np.pi) * points_per_circle))
-            if num_points == 0:
-                num_points = 1
-            angles_rad = np.linspace(start_angle, end_angle, num_points)
-            pxs_mm = turn_center_x_mm + turn_radius_mm * np.sin(angles_rad)
-            pys_mm = turn_center_y_mm - turn_radius_mm * np.cos(angles_rad)
-            for i in range(num_points):
-                self.trail.append((pxs_mm[i], pys_mm[i], angles_rad[i]))
-            self.x_mm = pxs_mm[num_points - 1]
-            self.y_mm = pys_mm[num_points - 1]
-            self.angle_rad = end_angle
+            ratio = mm_per_ms_left/mm_per_ms_right
 
-    def move_speed(self, steps_per_second_left, steps_per_second_right, ms):
-        steps_left = steps_per_second_left * ms / 1000
-        steps_right = steps_per_second_right * ms / 1000
-        self.move_steps(steps_left, steps_right)
+        if (ratio == 1):        # goes straight
+            for i in range(ms):
+                self.trail.append((self.x_mm, self.y_mm, self.angle_rad))
+                self.x_mm += (mm_per_ms_left) * np.sin(self.angle_rad)
+                self.y_mm += (mm_per_ms_left) * np.cos(self.angle_rad)
+
+        else:                   # goes around
+            radi = ((self.WHEEL_SPACING_MM)/(ratio-1))+(5.5/2)  # FIXME
+            alpha = (mm_per_ms_left*ms)/(radi + (self.WHEEL_SPACING_MM/2))
+            dphi = alpha/ms
+            dm = np.sin(dphi)*radi
+
+            for i in range(ms):
+                self.trail.append((self.x_mm, self.y_mm, self.angle_rad))
+                dx = dm*np.sin(self.angle_rad+(dphi/2))
+                dy = dm*np.cos(self.angle_rad+(dphi/2))
+                self.angle_rad += dphi
+                self.x_mm += dx
+                self.y_mm += dy
+
+    #def show_trail(self, ax, color):
+    #    xs_mm = []
+    #    ys_mm = []
+    #    for x_mm, y_mm, angle_rad in self.trail:
+    #        xs_mm.append(x_mm)
+    #        ys_mm.append(y_mm)
+    #    ax.plot(xs_mm, ys_mm, color=color)
+    #    self.trail.clear()
 
     def read_command_file(self, filename):
         f = open(filename, 'r')
