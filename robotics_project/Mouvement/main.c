@@ -16,6 +16,7 @@
 #include <audio/audio_thread.h>
 #include <odometrie.h>
 #include <listen.h>
+#include <process_image.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 
 messagebus_t bus;
@@ -63,7 +64,9 @@ int main(void) {
 	lauch_move_thd();
 	VL53L0X_start();
 	lauch_odometrie_thd();
+	//process_image_start();
 
+	set_pos(32,24,0);
 	/* Infinite loop. */
 	while (1) {
 		

@@ -9,7 +9,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in,BaseSequentialStream* out);
 
 void stop(BaseSequentialStream* out);
 
-void scan(BaseSequentialStream* out);
+void scan(BaseSequentialStream* in ,BaseSequentialStream* out);
 
 void lauch_move_thd(void);
 

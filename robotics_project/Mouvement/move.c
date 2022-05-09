@@ -117,15 +117,16 @@ void stop(BaseSequentialStream* out){
 	chprintf(out,"stopped.\r\n");
 }
 
-void scan(BaseSequentialStream* out){
+void scan(BaseSequentialStream* in ,BaseSequentialStream* out){
 	set_body_led(0);
+	volatile uint8_t turns = chSequentialStreamGet(in);
 	float ang = get_angle();
 	int16_t dist;
 	int turnspd = (int)(3.14159265359*RBTWIDTHCM*1000)/(13*secscan);
 	size_move = 1;
 	move_sequence[0] = turnspd;
 	move_sequence[1] = -turnspd;
-	move_sequence[2] = secscan*1000;
+	move_sequence[2] = secscan*turns*1000;
 	chBSemSignal(&sequence_ready_sem);
 	chprintf(out,"X%f Y%f P%f\r\n",get_posx(),get_posy(),get_angle());
 	while(!running_sequence){
@@ -137,6 +138,7 @@ void scan(BaseSequentialStream* out){
 		chprintf(out,"P%f D%i\r\n",ang,dist);
 		chThdSleepMilliseconds(TIMERES);
 	}
+	chprintf(out,"MAP\r\n");
 }
 
 void lauch_move_thd(void){

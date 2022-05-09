@@ -14,6 +14,7 @@ CSRC += ./main.c \
 		./move.c \
 		./odometrie.c \
 		./listen.c \
+		./process_image.c \
 
 #Header folders to include
 INCDIR +=

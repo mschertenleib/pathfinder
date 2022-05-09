@@ -8,6 +8,7 @@
 #include <move.h>
 #include <listen.h>
 #include <odometrie.h>
+#include <process_image.h>
 
 void listen( BaseSequentialStream* in, BaseSequentialStream* out){
     set_body_led(1); //ready to listen
@@ -30,11 +31,12 @@ void listen( BaseSequentialStream* in, BaseSequentialStream* out){
        volatile char c3 = (char)chSequentialStreamGet(in);
        char scom[4] = {c1,c2,c3,'\0'};
 
-       if(strcmp(scom,"CLS")==0){
-           chprintf(out,"Reset pos to 0,0,0.\r\n");
-           set_pos(0,0,0);
+       if(strcmp(scom,"CLR")==0){
+           chprintf(out,"Reset pos to 32 24.\r\n");
+           set_pos(32,24,0);
        }else if(strcmp(scom,"PIC")==0){
            chprintf(out,"%s\r\n",scom);
+           get_picture();
        }else if(strcmp(scom,"POS")==0){
            chprintf(out,"%s\r\n",scom);
            chprintf(out,"Robot at : %0.2f X %0.2f Y %0.2f Phi\r\n",get_posx(),get_posy(),get_angle());
@@ -50,7 +52,7 @@ void listen( BaseSequentialStream* in, BaseSequentialStream* out){
                stop(out);
            }else if(strcmp(lcom,"SCAN")==0){
                chprintf(out,"%s\r\n",lcom);
-               scan(out);
+               scan(in,out);
            }else if(strcmp(lcom,"BEEP")==0){
                chprintf(out,"%s!\r\n",lcom);
                dac_start();
