@@ -2,7 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-class Epuck2:
+class EPuck2:
+    """
+    Class representing the e-puck2 robot, its physical dimensions, and offering a set of methods used to simulate the robot
+    """
 
     RADIUS_MM = 36.5
     WHEEL_SPACING_MM = 54
@@ -25,6 +28,16 @@ class Epuck2:
         return abs(steps_per_second) <= self.MAX_STEPS_PER_SECOND
 
     def draw(self, ax, color):
+        """
+        Draws the robot
+        
+        Parameter
+        ---
+        ax:
+            The matplotlib Axes instance on which to draw
+        color:
+            The color to use when drawing
+        """
 
         # Draw outer circle
         points_per_circle = 100
@@ -89,6 +102,17 @@ class Epuck2:
                 color=color)
 
     def draw_trail(self, ax, color):
+        """
+        Draws the trail of the robot, i.e. the path it followed
+        
+        Parameter
+        ---
+        ax:
+            The matplotlib Axes instance on which to draw
+        color:
+            The color to use when drawing
+        """
+        
         xs_mm = []
         ys_mm = []
         for x_mm, y_mm, angle_rad in self.trail:
@@ -97,6 +121,16 @@ class Epuck2:
         ax.plot(xs_mm, ys_mm, color=color)
 
     def move_steps(self, steps_left, steps_right):
+        """
+        Moves the simulated robot by the given number of steps
+        
+        Parameters
+        ---
+        steps_left:
+            Number of steps to turn the left motor
+        steps_right:
+            Number of steps to turn the right motor
+        """
 
         distance_left_mm = steps_left * self.MM_PER_STEP
         distance_right_mm = steps_right * self.MM_PER_STEP
@@ -107,14 +141,19 @@ class Epuck2:
             self.trail.append((self.x_mm, self.y_mm, self.angle_rad))
 
         else:
-            turn_radius_mm = 0.5 * (distance_left_mm + distance_right_mm) / (distance_right_mm - distance_left_mm) * self.WHEEL_SPACING_MM
-            turn_angle_rad = (distance_right_mm - distance_left_mm) / self.WHEEL_SPACING_MM
+            turn_radius_mm = 0.5 * (distance_left_mm + distance_right_mm) / (
+                distance_right_mm - distance_left_mm) * self.WHEEL_SPACING_MM
+            turn_angle_rad = (distance_right_mm -
+                              distance_left_mm) / self.WHEEL_SPACING_MM
             start_angle = self.angle_rad
             end_angle = start_angle + turn_angle_rad
-            turn_center_x_mm = self.x_mm - turn_radius_mm * np.sin(self.angle_rad)
-            turn_center_y_mm = self.y_mm + turn_radius_mm * np.cos(self.angle_rad)
+            turn_center_x_mm = self.x_mm - \
+                turn_radius_mm * np.sin(self.angle_rad)
+            turn_center_y_mm = self.y_mm + \
+                turn_radius_mm * np.cos(self.angle_rad)
             points_per_circle = 100
-            num_points = int(abs(turn_angle_rad / (2 * np.pi) * points_per_circle))
+            num_points = int(
+                abs(turn_angle_rad / (2 * np.pi) * points_per_circle))
             if num_points == 0:
                 num_points = 1
             angles_rad = np.linspace(start_angle, end_angle, num_points)
@@ -126,52 +165,69 @@ class Epuck2:
             self.y_mm = pys_mm[num_points - 1]
             self.angle_rad = end_angle
 
-    def move_speed(self, steps_per_second_left, steps_per_second_right, ms):
-        steps_left = steps_per_second_left * ms / 1000
-        steps_right = steps_per_second_right * ms / 1000
+    def move_speed(self, steps_per_second_left, steps_per_second_right, duration_ms):
+        """
+        Moves the simulated robot with the given speed during the specified time
+        
+        Parameters
+        ---
+        steps_per_second_left:
+            Speed of the left motor
+        steps_per_second_right:
+            Speed of the right motor
+        duration_ms:
+            Duration of the move in milliseconds
+        """
+        
+        steps_left = steps_per_second_left * duration_ms / 1000
+        steps_right = steps_per_second_right * duration_ms / 1000
         self.move_steps(steps_left, steps_right)
 
     def read_command_file(self, filename):
+        """
+        Read the specified file and executes the moves
+        
+        Parameters
+        ---
+        filename:
+            The name of the instruction file to read
+        """
+        
         f = open(filename, 'r')
-        while 1:
+        while True:
             command = f.readline()
             if not command:
                 break
 
-            if command[0:4] == "MOVE":
-                size = int(int(f.readline())/3)
+            if command[0:5] == '!MOVE':
+                size = int(int(f.readline()) / 3)
                 if size == 1:
                     size = 0
                 for i in range(size):
-                    a, b, c = f.readline().split(" ")
-                    steps_per_second_left, steps_per_second_right, time_ms = int(
-                        a), int(b), int(c)
+                    steps_per_second_left_str, steps_per_second_right_str, time_ms_str = f.readline().split(' ')
+                    steps_per_second_left = int(steps_per_second_left_str)
+                    steps_per_second_right = int(steps_per_second_right_str)
+                    time_ms = int(time_ms_str)
 
-                    if self.check_speed(steps_per_second_left) and self.check_speed(steps_per_second_right):
-                        print("Moving...", steps_per_second_left,
-                              steps_per_second_right, time_ms)
-                        self.move(steps_per_second_left,
-                                  steps_per_second_right, time_ms)
-                        self.show_trail("#ff0000")
-                    else:
-                        print("Invalid speed (>1000):",
+                    if not self.is_speed_valid(steps_per_second_left) or not self.is_speed_valid(steps_per_second_right):
+                        print('Invalid speed (>', self.MAX_STEPS_PER_SECOND, '):',
                               steps_per_second_left, steps_per_second_right)
                         exit()
-            elif command[0:3] == "END":
-                str, b, c = command.split(" ")
-                supx, supy = float(b), float(c)
-                print("err X: %2f Y: %2f " %
-                      (self.x_mm - supx, self.y_mm - supy))
+
+                    print('Moving', steps_per_second_left,
+                          steps_per_second_right, time_ms)
+                    self.move_speed(steps_per_second_left,
+                                    steps_per_second_right, time_ms)
+
+            elif command[0:3] == 'END':
+                end_str, sup_x_str, sup_y_str = command.split(' ')
+                sup_x_mm, sup_y_mm = float(sup_x_str), float(sup_y_str)
+                print('Error X:', self.x_mm - sup_x_mm,
+                      'mm   Y:', self.y_mm - sup_y_mm, 'mm')
                 break
             else:
-                print("No commands found")
+                print('No commands found')
                 exit()
 
         f.close()
-        print(filename, "done.")
-
-    def simulate(self, instrfile):
-        self.read_command_file(instrfile)
-        self.draw("#000000")
-
-        plt.show()
+        print(filename, 'Done.')

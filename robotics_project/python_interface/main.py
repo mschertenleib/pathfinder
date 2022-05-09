@@ -439,7 +439,7 @@ def update():
     map_ax.clear()
     map_ax.imshow(img)
     robot.draw(map_ax, color="#00ff00")
-    #map_ax.invert_yaxis()
+    map_ax.invert_yaxis()
 
     fig.canvas.draw()
     fig.canvas.flush_events()
@@ -491,9 +491,9 @@ if __name__ == '__main__':
     
     line_thickness = 1
 
-    WALKABLE_MIN_RADIUS = EPuck2.Epuck.RADIUS_MM * 2
+    WALKABLE_MIN_RADIUS = EPuck2.EPuck2.RADIUS_MM * 2
 
-    robot = EPuck2.Epuck(x_mm=width_mm/2, y_mm=height_mm/2, angle_rad=np.pi/4)
+    robot = EPuck2.EPuck2(x_mm=width_mm/2, y_mm=height_mm/2, angle_rad=np.pi/6)
     current_move = Move()
 
     constructed_map = envmap.Environment_map(
@@ -512,7 +512,7 @@ if __name__ == '__main__':
 
     # Create buttons
     button_color = 'lightgoldenrodyellow'
-    button_hovercolor = '0.975'
+    button_hovercolor = '0.95'
 
     BUTTON_Y = 0.025
     BUTTON_HEIGHT = 0.04
