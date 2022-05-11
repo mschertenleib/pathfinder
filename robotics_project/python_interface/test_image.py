@@ -94,8 +94,7 @@ if __name__ == '__main__':
 
     # test if the serial port as been given as argument in the terminal
     if len(sys.argv) != 2:
-        print(
-            'Usage: {} <port>'.format(sys.argv[0]))
+        print('Please give port as argument')
         sys.exit(0)
 
     port = sys.argv[1]

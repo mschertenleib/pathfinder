@@ -212,7 +212,7 @@ class EPuck2:
                     if not self.is_speed_valid(steps_per_second_left) or not self.is_speed_valid(steps_per_second_right):
                         print('Invalid speed (>', self.MAX_STEPS_PER_SECOND, '):',
                               steps_per_second_left, steps_per_second_right)
-                        exit()
+                        return
 
                     print('Moving', steps_per_second_left,
                           steps_per_second_right, time_ms)
@@ -220,14 +220,14 @@ class EPuck2:
                                     steps_per_second_right, time_ms)
 
             elif command[0:3] == 'END':
-                end_str, sup_x_str, sup_y_str = command.split(' ')
-                sup_x_mm, sup_y_mm = float(sup_x_str), float(sup_y_str)
-                print('Error X:', self.x_mm - sup_x_mm,
-                      'mm   Y:', self.y_mm - sup_y_mm, 'mm')
+                end_str, supposed_x_str, supposed_y_str = command.split(' ')
+                supposed_x_mm, supposed_y_mm = float(supposed_x_str), float(supposed_y_str)
+                print('Error X:', self.x_mm - supposed_x_mm,
+                      'mm   Y:', self.y_mm - supposed_y_mm, 'mm')
                 break
             else:
                 print('No commands found')
-                exit()
+                return
 
         f.close()
         print(filename, 'Done.')

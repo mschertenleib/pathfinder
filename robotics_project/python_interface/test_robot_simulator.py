@@ -43,15 +43,13 @@ if __name__ == '__main__':
     STEPS_PER_90_DEG_ONE_WHEEL = STEPS_PER_90_DEG * 2
 
     moves = [(1000, 1000),
-             (0, STEPS_PER_90_DEG_ONE_WHEEL),
-             (1000, 1000),
-             (-STEPS_PER_90_DEG, STEPS_PER_90_DEG),
-             (1000, 1000),
-             (0, STEPS_PER_90_DEG_ONE_WHEEL),
-             (1000, 1000),
-             (-STEPS_PER_90_DEG, STEPS_PER_90_DEG)]
-
-    moves_steps = [(-1240/10, 1700/10)]
+             (0, STEPS_PER_90_DEG_ONE_WHEEL)]
+             #(1000, 1000),
+             #(-STEPS_PER_90_DEG, STEPS_PER_90_DEG),
+             #(1000, 1000),
+             #(0, STEPS_PER_90_DEG_ONE_WHEEL),
+             #(1000, 1000),
+             #(-STEPS_PER_90_DEG, STEPS_PER_90_DEG)]
 
     current_move = 0
 
@@ -67,7 +65,7 @@ if __name__ == '__main__':
                          color=button_color, hovercolor=button_hovercolor)
     next_button.on_clicked(on_next_clicked)
     
-    robot.read_command_file('test_instructions.txt')
+    #robot.read_command_file('test_instructions.txt')
     
     update_view()
 

@@ -1,331 +1,27 @@
-import cv2
-from matplotlib.backend_bases import MouseButton
-import environment_map as envmap
 import EPuck2
-import os
-import struct
-import time
-import serial
+import environment_map as envmap
+import move
+import communication as comm
+
+
+import cv2
 import sys
 import numpy as np
-from matplotlib.widgets import Button
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Button, RadioButtons
+from matplotlib.backend_bases import MouseButton
 import matplotlib
 matplotlib.use('TkAgg')
 
-SPCM = 1000/13  # steps per cm
+
 RAD = 2*10000  # unit correction
-ESP_D = 5.5  # distance between wheel contact points
 APRPP = 3  # nb approx per line for bezier
+timecom_ms = 30000
+instrfile = 'instructions.txt'
 
-size = 50  # size of the map in cm
 
-original_stdout = sys.stdout
-
-com_port = 'COM15'
-
-instrfile = 'instructions.txt'  # sys.argv[1][2:]
-#APRPP = int(sys.argv[2])
-timecom = 1000  # int(sys.argv[3])*1000
-
-goal_mm = (0, 0)
-
-################################# Internal Functions #################################
-
-
-def recursive_bezier(points, t):
-    if(len(points) != 1):
-        new_points = []
-        for i in range(len(points)-1):
-            px = points[i][0] + t*(points[i+1][0]-points[i][0])
-            py = points[i][1] + t*(points[i+1][1]-points[i][1])
-            new_points.append([px, py])
-        return recursive_bezier(new_points, t)
-    else:
-        return points[0]
-
-
-def angle_points(a0, a1, b0, b1):
-    v1 = [a1[0]-a0[0], a1[1]-a0[1]]
-    v2 = [b1[0]-b0[0], b1[1]-b0[1]]
-    nv1 = [v1[1], -v1[0]]
-    if np.dot(nv1, v2) >= 0:
-        return np.arccos((v1[0]*v2[0] + v1[1]*v2[1])/(norm(v1) * norm(v2)))
-    else:
-        return -np.arccos((v1[0]*v2[0] + v1[1]*v2[1])/(norm(v1) * norm(v2)))
-
-
-def norm(vect):
-    return np.sqrt(vect[0]**2 + vect[1]**2)
-
-
-def dist(a, b):
-    return np.sqrt((b[0]-a[0])**2 + (b[1]-a[1])**2)
-
-
-def circle_center_from_3_points(p1, p2, p3):
-    z1 = p1[0] + p1[1]*1j
-    z2 = p2[0] + p2[1]*1j
-    z3 = p3[0] + p3[1]*1j
-
-    if (z1 == z2) or (z2 == z3) or (z3 == z1):
-        raise ValueError(f'Duplicate points: {p1},{p2},{p3}')
-
-    w = (z3 - z1)/(z2 - z1)
-
-    if w.imag == 0:
-        return p1  # if colinear just sends first point
-
-    c = (z2 - z1)*(w - abs(w)**2)/(2j*w.imag) + z1  # Simplified denominator
-
-    return [c.real, c.imag]
-
-################################# Class def #################################
-
-
-class Move:
-    def __init__(self):
-        self.data = [[0, 0]]
-        self.path = []
-        self.command = []
-        self.wspace = ESP_D
-        self.color = "#000000"
-
-    def clear(self):
-        self.data.clear()
-        self.data.append([0, 0])
-        self.path.clear()
-        self.command.clear()
-
-    def show_path(self):
-        x = []
-        y = []
-        for point in self.path:
-            x.append(point[0])
-            y.append(point[1])
-        plt.plot(x, y, c="#ff0000")
-        plt.show()
-
-    def gen_bezier_path(self, steps):
-        steps *= (len(self.data)-1)
-        self.path.clear()
-        for i in range(steps+1):
-            t = i/steps
-            self.path.append(recursive_bezier(self.data, t))
-
-    def gen_stg_command(self, time):
-        self.path.clear()
-        nbcom = (len(self.data)-1)*2
-        tps = int(time/nbcom)
-        print(time, len(self.data), nbcom, tps)
-        self.command.clear()
-
-        for i in range(len(self.data)-1):
-            # turning phase
-            if i == 0:
-                alpha = angle_points(
-                    [0, 0], [0, 1], self.data[0], self.data[1])
-            else:
-                alpha = angle_points(
-                    self.data[i-1], self.data[i], self.data[i], self.data[i+1])
-            #print("angl %d : %2f"%(i,alpha*(180/np.pi)))
-            l = int((((ESP_D/2)*alpha)*SPCM*1000)/tps)
-            r = int((-((ESP_D/2)*alpha)*SPCM*1000)/tps)
-            self.command.append([l, r, tps])
-            # forward phase
-            spd = int((dist(self.data[i], self.data[i+1])*SPCM*1000)/tps)
-            self.command.append([spd, spd, tps])
-
-    def smooth_line(self):
-        print("to be done")
-
-    def pathlen(self):
-        acc = 0
-        for i in range(len(self.path) - 1):
-            acc += dist(self.path[i], self.path[i+1])
-        return acc
-
-    def genfile(self, filename):
-        f = open(filename, 'w')
-        sys.stdout = f  # Change the standard output to the file we created.
-        print('!MOVE')
-        nb_word = len(self.command)*3
-        print(nb_word)
-
-        for step in self.command:
-            cmdline = str(step)[1:len(str(step))-1]
-            lspd, rspd, stime = cmdline.split(", ")
-            print(lspd, rspd, stime)
-
-        print("END %.2f %.2f" % (self.data[-1][0], self.data[-1][1]))
-        sys.stdout = original_stdout  # Reset the standard output to its original value
-
-    def gen_bez_command(self, time):
-        self.command.clear()
-        timestep = (int)(time/((len(self.path)/2 - 1)))
-
-        for i in range(0, len(self.path)-2, 2):
-            center = circle_center_from_3_points(
-                self.path[i], self.path[i+1], self.path[i+2])
-            if(center == self.path[i]):  # if goes straight
-                Rtrav = dist(self.path[i], self.path[i+2])
-                Ltrav = int(Rtrav*SPCM*(1000/timestep))
-                self.command.append([Ltrav, Ltrav, timestep])
-
-            else:
-                rad = dist(self.path[i], center)
-                angle = 2 * \
-                    np.arcsin((dist(self.path[i], self.path[i+2]))/(2*rad))
-                #print("angle = {:.2f}deg".format(angle*(180/np.pi)))
-                # vect perp au deux premier point dir droite
-                Pvect = [(self.path[i+1][1]-self.path[i][1]), -
-                         (self.path[i+1][0]-self.path[i][0])]
-                Rvect = [center[0]-self.path[i][0], center[1] -
-                         self.path[i][1]]  # vect point i in center
-
-                if np.dot(Pvect, Rvect) > 0:  # determine si centre a droite
-                    Rtrav = (rad - (self.wspace/2))*angle
-                    Ltrav = (rad + (self.wspace/2))*angle
-                    a = (int)(Ltrav*SPCM*(1000/timestep))
-                    b = (int)(Rtrav*SPCM*(1000/timestep))
-                    c = timestep
-                    self.command.append([a, b, c])
-
-                else:                                                          # ou gauche
-                    Rtrav = (rad + (self.wspace/2))*angle
-                    Ltrav = (rad - (self.wspace/2))*angle
-                    a = (int)(Ltrav*SPCM*(1000/timestep))
-                    b = (int)(Rtrav*SPCM*(1000/timestep))
-                    c = timestep
-                    self.command.append([a, b, c])
-
-
-################################# communication #################################
-
-def send_instr(file, port):
-    ser = serial.Serial(port, 57600, timeout=5)
-    if(not ser.is_open):
-        ser.open()
-
-    file = open(file, "r")
-
-    command = []
-
-    instr = file.readline().rstrip("\n")
-    len = int(file.readline().rstrip("\n"))
-    for i in range(len):
-        for inf in file.readline().split():
-            if(inf == "END"):
-                print("finished reading", instrfile)
-                break
-            command.append(int(inf))
-
-    for c in instr:  # send instr like "MOVE"
-        ser.write(c.encode('utf-8'))
-
-    time.sleep(1)  # send size of data
-    ser.write(struct.pack(">h", len))
-
-    for inf in command:  # sends data
-        ser.write(struct.pack(">h", inf))
-
-    for c in "END":
-        ser.write(c.encode('utf-8'))
-
-    print("sent:", instr, len, command)
-    confirm = ser.read(1).decode("ascii")
-    print(confirm)
-    if(confirm == 'c'):
-        print(" Confirmed !")
-    else:
-        print(" epuck didn't listen. again. ")
-    ser.close()
-
-
-def listen_ser(port, time):
-    print("Opening ", port, " and reading :")
-    ser = serial.Serial(port, 57600, timeout=1)
-    if(not ser.is_open):
-        ser.open()
-    i = 0
-    while i < time:
-        bytesToRead = ser.inWaiting()
-        serstr = ser.read(bytesToRead)
-        if serstr != b'':
-            i = 0
-            ret = serstr.decode("ascii")
-            print("->", ret)
-            if ret.find("DONE") != -1:
-                break
-        else:
-            i += 1
-    print("stopped listening.", i)
-    ser.close()
-
-
-def read_robot_data(ser: serial.Serial, time):
-    i = 0
-    ret = str()
-    while i < time:
-        bytesToRead = ser.inWaiting()
-        serstr = ser.read(bytesToRead)
-        if serstr != b'':
-            i = 0
-            ascii_string = serstr.decode("ascii")
-            print(ascii_string)
-            if len(ret) == 0 and ascii_string.find('SCAN') != 0:
-                print('Unexpected bytes received')
-                return []
-
-            ret += ascii_string
-            if ascii_string.find('MAP') != -1:
-                break
-        else:
-            i += 1
-    print("stopped listening.", i)
-    ser.close()
-    return ret
-
-################################# Events Functions #################################
-
-
-def on_mouse_button_press(event):
-    if event.inaxes is map_ax:
-        if event.button is MouseButton.LEFT:
-            global goal_mm
-            goal_mm = (event.xdata, event.ydata)
-
-        elif event.button is MouseButton.RIGHT:
-            ix, iy = event.xdata, event.ydata
-            print('x = %.2f, y = %.2f' % (ix, iy))
-            current_move.data.append([ix / 10, iy / 10])
-            x = []
-            y = []
-            for point in current_move.data:
-                x.append(point[0]*10)
-                y.append(point[1]*10)
-            map_ax.plot(x, y, c="#00ff55")
-
-
-def action_send_instruction():
-    send_instr(instrfile, com_port)
-    listen_ser(com_port, 1e6)
-
-
-def action_listen():
-    listen_ser(com_port, 1e6)
-
-
-def action_scan():
-    ser = serial.Serial(com_port, 57600, timeout=5)
-
-    for c in '!SCAN':
-        ser.write(c.encode('utf-8'))
-
-    ser.write(struct.pack(">B", 5))
-    
-    data = read_robot_data(ser, 1e6)
-    construct_from_read_scan(data)
+# Disable all serial communication for testing purposes
+use_serial = True#False
 
 
 def construct_from_read_scan(data):
@@ -338,7 +34,8 @@ def construct_from_read_scan(data):
         return
 
     x_str, y_str, angle_str = lines[1].split(' ')
-    x_mm, y_mm, angle_rad = float(x_str[1:]) * 10, float(y_str[1:]) * 10, float(angle_str[1:])
+    x_mm, y_mm, angle_rad = float(
+        x_str[1:]) * 10, float(y_str[1:]) * 10, float(angle_str[1:])
 
     for string_line in lines[2:len(lines)-3]:
         if not string_line:
@@ -346,11 +43,12 @@ def construct_from_read_scan(data):
 
         (x_mm, y_mm, angle_rad, distance_mm) = convert_read_scan_to_x_y_angle_dist(
             x_mm, y_mm, string_line)
-        robot.set(x_mm, y_mm, angle_rad)
-        constructed_map.construct((x_mm, y_mm), angle_rad, EPuck2.Epuck.RADIUS_MM, distance_mm,
-                                  EPuck2.Epuck.TOF_SENSOR_OFFSET_MM, EPuck2.Epuck.TOF_MAX_DISTANCE_MM, line_thickness)
-        update()
-    
+        robot.x_mm = x_mm
+        robot.y_mm = y_mm
+        robot.angle_rad = angle_rad
+        constructed_map.construct((x_mm, y_mm), angle_rad, EPuck2.EPuck2.RADIUS_MM, distance_mm,
+                                  EPuck2.EPuck2.TOF_SENSOR_OFFSET_MM, EPuck2.EPuck2.TOF_MAX_DISTANCE_MM, line_thickness)
+
     if lines[len(lines)-2].find('MAP') == -1:
         print('Unexpected ending to the message')
         return
@@ -363,215 +61,234 @@ def convert_read_scan_to_x_y_angle_dist(x_mm, y_mm, data: str):
     return (x_mm, y_mm, angle_rad, distance_mm)
 
 
-def action_restart():
-    robot.set(0, 0, 0)
-    robot.simulate(instrfile)
-
-
-def action_clear():
-    print("Clearing move and robot")
-    current_move.clear()
-    robot.set(0, 0, 0)
-
-
-def action_bezier():
-    print("Generating Bezier command")
-    current_move.gen_bezier_path(APRPP)
-    current_move.gen_bez_command(timecom)
-    current_move.show_path()
-    # print(current_move.command)
-    current_move.genfile(instrfile)
-
-
-def action_stg():
-    print("Generating stop-turn-go command")
-    current_move.gen_stg_command(timecom)
-    # print(current_move.command)
-    current_move.genfile(instrfile)
-
-def action_shortest_path():
-    print('Generating shortest path command')
+def on_set_button_clicked(event):
+    robot.x_mm, robot.y_mm = current_move.data[-1]
+    robot.angle_rad = 0
+    current_move.reset_data(robot.x_mm, robot.y_mm)
     
-    path = constructed_map.find_path((robot.x_mm, robot.y_mm), goal_mm, WALKABLE_MIN_RADIUS)
-    print('test')
-    if len(path) >= 2:
-        for px_mm, py_mm in path:
-            current_move.data.append([px_mm / 10, py_mm / 10])
+    if use_serial:
+        comm.clean_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
 
-        current_move.gen_stg_command(timecom)
-        print('current_move:', current_move.command)
-        current_move.genfile(instrfile)
-    else:
-        print('No path found')
-
-
-def on_key_press(event):
-    print('Pressed', event.key)
-    sys.stdout.flush()
-    if event.key == 'x':
-        action_send_instruction()
-    elif event.key == 'l':
-        action_listen()
-    elif event.key == 'r':
-        action_restart()
-    elif event.key == 'c':
-        action_clear()
-    elif event.key == 'b':
-        action_bezier()
-    elif event.key == 'n':
-        action_stg()
-
-
-def update():
-    map_image = constructed_map.as_image_with_walkable(WALKABLE_MIN_RADIUS, (255, 255, 0))
-    img = cv2.resize(map_image, dsize=(height_px, width_px), interpolation=cv2.INTER_NEAREST)
-
-    center = (int(goal_mm[0] + cell_size_mm / 2), int(goal_mm[1] + cell_size_mm / 2))
-    cv2.circle(img, center, cell_size_mm // 2, (255, 0, 0), 2)
-    path = constructed_map.find_path(
-        (robot.x_mm, robot.y_mm), goal_mm, WALKABLE_MIN_RADIUS)
-    if len(path) >= 2:
-        for i in range(len(path)-1):
-            start = (int(path[i][0]), int(path[i][1]))
-            end = (int(path[i+1][0]), int(path[i+1][1]))
-            cv2.line(img, start, end, (0, 0, 255), 2)
-
-    map_ax.clear()
-    map_ax.imshow(img)
-    robot.draw(map_ax, color="#00ff00")
-    map_ax.invert_yaxis()
-
-    fig.canvas.draw()
-    fig.canvas.flush_events()
-
-
-def on_update_button_clicked(event):
-    update()
+    update_view()
 
 
 def on_send_instruction_button_clicked(event):
-    action_send_instruction()
+    if use_serial:
+        comm.send_instruction_file(ser, instrfile)
+        comm.listen_serial(ser, 1e6)
 
 
 def on_listen_button_clicked(event):
-    action_listen()
+    if use_serial:
+        comm.listen_serial(ser, 1e6)
 
 
 def on_scan_button_clicked(event):
-    action_scan()
+    if use_serial:
+        data_str = comm.scan(ser)
+        print(data_str)
+        construct_from_read_scan(data_str)
 
-
-def on_restart_button_clicked(event):
-    action_restart()
-
-
-def on_clear_button_clicked(event):
-    action_clear()
+        update_view()
 
 
 def on_bezier_button_clicked(event):
-    action_bezier()
+    print('Generating Bezier command')
+
+    current_move.gen_bezier_path(APRPP)
+    current_move.gen_bez_command(timecom_ms)
+    current_move.genfile(instrfile)
+
+    robot.read_command_file(instrfile)
+    
+    if use_serial:
+        comm.move_robot(ser, current_move)
+
+    current_move.reset_data(robot.x_mm, robot.y_mm)
+
+    update_view()
 
 
 def on_stg_button_clicked(event):
-    action_stg()
+    print('Generating Stop-Turn-Go command')
 
+    current_move.gen_stg_command(timecom_ms, robot.angle_rad)
+    current_move.genfile(instrfile)
 
-def on_shortest_path_button_clicked(event):
-    action_shortest_path()
-
-
-if __name__ == '__main__':
-
-    width_mm = 600
-    height_mm = 600
-    cell_size_mm = 20
-    width_px = width_mm
-    height_px = height_mm
+    robot.read_command_file(instrfile)
     
-    line_thickness = 1
+    if use_serial:
+        comm.move_robot(ser, current_move)
 
-    WALKABLE_MIN_RADIUS = EPuck2.EPuck2.RADIUS_MM * 2
+    current_move.reset_data(robot.x_mm, robot.y_mm)
 
-    robot = EPuck2.EPuck2(x_mm=width_mm/2, y_mm=height_mm/2, angle_rad=np.pi/6)
-    current_move = Move()
+    update_view()
 
-    constructed_map = envmap.Environment_map(
-        width_mm=width_mm, height_mm=height_mm, cell_size_mm=cell_size_mm)
 
-    # Create figures and subplots
-    fig = plt.figure()
-    map_ax = fig.add_subplot()
+def on_get_pos_button_clicked(event):
+    if use_serial:
+        robot.x_mm, robot.y_mm, robot.angle_rad = comm.get_robot_pos(ser)
+        print(robot.x_mm, robot.y_mm, robot.angle_rad)
+        current_move.reset_data(robot.x_mm, robot.y_mm)
+
+        update_view()
+
+
+def on_radio_button_clicked(label):
+    global use_shortest_path
+    if label == LABEL_SHORTEST:
+        use_shortest_path = True
+    if label == LABEL_DIRECT:
+        use_shortest_path = False
+
+
+def on_mouse_button_press(event):
+    if event.inaxes is map_ax:
+        if event.button is MouseButton.LEFT:
+            goal_mm = (event.xdata, event.ydata)
+            if use_shortest_path:
+                start_mm = (robot.x_mm, robot.y_mm)
+                path = constructed_map.find_path(
+                    start_mm, goal_mm, WALKABLE_MIN_RADIUS)
+                if len(path) >= 2:
+                    for point_mm in path:
+                        current_move.data.append(point_mm)
+                else:
+                    print('Can not find a path to the specified goal')
+            else:
+                current_move.data.append(goal_mm)
+
+            update_view()
+
+
+def update_view():
+    map_image = constructed_map.as_image_with_walkable(
+        WALKABLE_MIN_RADIUS, (255, 255, 0))
+    img = cv2.resize(map_image, dsize=(height_px, width_px),
+                     interpolation=cv2.INTER_NEAREST)
+
+    map_ax.clear()
     map_ax.set_title('Map')
     map_ax.set_aspect('equal', 'box')
     map_ax.set_xlim([0, width_mm])
     map_ax.set_ylim([0, height_mm])
     map_ax.set_xlabel('millimeters')
     map_ax.set_ylabel('millimeters')
-    plt.subplots_adjust(bottom=0.2)
 
-    # Create buttons
-    button_color = 'lightgoldenrodyellow'
-    button_hovercolor = '0.95'
+    # Draw map
+    map_ax.imshow(img)
 
-    BUTTON_Y = 0.025
-    BUTTON_HEIGHT = 0.04
-    NUM_BUTTONS = 9
-    BUTTON_MARGIN = 0.01
-    BUTTON_SPACING = (1 - BUTTON_MARGIN) / NUM_BUTTONS
-    BUTTON_WIDTH = BUTTON_SPACING - BUTTON_MARGIN
+    # Draw robot
+    robot.draw(map_ax, color='#00ff00')
 
-    update_button_ax = plt.axes(
-        [BUTTON_MARGIN, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    send_instruction_button_ax = plt.axes(
-        [BUTTON_MARGIN + BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    listen_button_ax = plt.axes(
-        [BUTTON_MARGIN + 2 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    restart_button_ax = plt.axes(
-        [BUTTON_MARGIN + 3 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    clear_button_ax = plt.axes(
-        [BUTTON_MARGIN + 4 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    bezier_button_ax = plt.axes(
-        [BUTTON_MARGIN + 5 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    stg_button_ax = plt.axes(
-        [BUTTON_MARGIN + 6 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    scan_button_ax = plt.axes(
-        [BUTTON_MARGIN + 7 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-    shortest_path_button_ax = plt.axes(
-        [BUTTON_MARGIN + 8 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+    # Draw robot trail
+    robot.draw_trail(map_ax, color='#00ffff')
 
-    update_button = Button(update_button_ax, 'Update',
-                           color=button_color, hovercolor=button_hovercolor)
-    send_instruction_button = Button(
-        send_instruction_button_ax, 'Send', color=button_color, hovercolor=button_hovercolor)
-    listen_button = Button(listen_button_ax, 'Listen',
-                           color=button_color, hovercolor=button_hovercolor)
-    restart_button = Button(restart_button_ax, 'Restart',
-                            color=button_color, hovercolor=button_hovercolor)
-    clear_button = Button(clear_button_ax, 'Clear',
-                          color=button_color, hovercolor=button_hovercolor)
-    bezier_button = Button(bezier_button_ax, 'Bezier',
-                           color=button_color, hovercolor=button_hovercolor)
-    stg_button = Button(stg_button_ax, 'STG',
-                        color=button_color, hovercolor=button_hovercolor)
-    scan_button = Button(scan_button_ax, 'Scan',
-                         color=button_color, hovercolor=button_hovercolor)
-    shortest_path_button = Button(shortest_path_button_ax, 'Path',
-                         color=button_color, hovercolor=button_hovercolor)
+    # Draw move
+    current_move.draw_path(map_ax, '#0000ff')
 
-    update_button.on_clicked(on_update_button_clicked)
-    send_instruction_button.on_clicked(on_send_instruction_button_clicked)
-    listen_button.on_clicked(on_listen_button_clicked)
-    restart_button.on_clicked(on_restart_button_clicked)
-    clear_button.on_clicked(on_clear_button_clicked)
-    bezier_button.on_clicked(on_bezier_button_clicked)
-    stg_button.on_clicked(on_stg_button_clicked)
-    scan_button.on_clicked(on_scan_button_clicked)
-    shortest_path_button.on_clicked(on_shortest_path_button_clicked)
+    # Draw goal
+    points_per_circle = 100
+    angles_rad = np.linspace(0, 2 * np.pi, points_per_circle)
+    goal_mm = current_move.data[len(current_move.data) - 1]
+    pxs_mm = goal_mm[0] + cell_size_mm / 2 * np.cos(angles_rad)
+    pys_mm = goal_mm[1] + cell_size_mm / 2 * np.sin(angles_rad)
+    map_ax.plot(pxs_mm, pys_mm, color='#ff0000')
 
-    # Connect events
-    fig.canvas.mpl_connect('button_press_event', on_mouse_button_press)
-    fig.canvas.mpl_connect('key_press_event', on_key_press)
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
-    # Start the matplotlib main
-    plt.show()
+
+if use_serial:
+    if len(sys.argv) != 2:
+        print('Please give the serial port to use as argument')
+        sys.exit()
+
+    ser = comm.open_port(sys.argv[1])
+
+width_mm = 600
+height_mm = 600
+cell_size_mm = 20
+width_px = width_mm
+height_px = height_mm
+
+line_thickness = 1
+
+WALKABLE_MIN_RADIUS = EPuck2.EPuck2.RADIUS_MM * 2
+
+robot = EPuck2.EPuck2(x_mm=width_mm / 2, y_mm=height_mm / 2, angle_rad=0)
+current_move = move.Move(robot.x_mm, robot.y_mm)
+
+constructed_map = envmap.Environment_map(
+    width_mm=width_mm, height_mm=height_mm, cell_size_mm=cell_size_mm)
+
+# Create figures and subplots
+fig = plt.figure()
+map_ax = fig.add_subplot()
+plt.subplots_adjust(bottom=0.2)
+
+# Create buttons
+button_color = 'lightgoldenrodyellow'
+button_hovercolor = '0.95'
+
+BUTTON_Y = 0.025
+BUTTON_HEIGHT = 0.04
+NUM_BUTTONS = 9
+BUTTON_MARGIN = 0.01
+BUTTON_SPACING = (1 - BUTTON_MARGIN) / NUM_BUTTONS
+BUTTON_WIDTH = BUTTON_SPACING - BUTTON_MARGIN
+
+send_instruction_button_ax = plt.axes(
+    [BUTTON_MARGIN + 0 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+listen_button_ax = plt.axes(
+    [BUTTON_MARGIN + 1 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+set_button_ax = plt.axes(
+    [BUTTON_MARGIN + 2 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+bezier_button_ax = plt.axes(
+    [BUTTON_MARGIN + 3 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+stg_button_ax = plt.axes(
+    [BUTTON_MARGIN + 4 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+get_pos_button_ax = plt.axes(
+    [BUTTON_MARGIN + 5 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+scan_button_ax = plt.axes(
+    [BUTTON_MARGIN + 6 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+radio_button_ax = plt.axes(
+    [BUTTON_MARGIN + 7 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, 3 * BUTTON_HEIGHT])
+
+set_button = Button(set_button_ax, 'Set',
+                    color=button_color, hovercolor=button_hovercolor)
+send_instruction_button = Button(
+    send_instruction_button_ax, 'Send', color=button_color, hovercolor=button_hovercolor)
+listen_button = Button(listen_button_ax, 'Listen',
+                       color=button_color, hovercolor=button_hovercolor)
+bezier_button = Button(bezier_button_ax, 'Bezier',
+                       color=button_color, hovercolor=button_hovercolor)
+stg_button = Button(stg_button_ax, 'STG',
+                    color=button_color, hovercolor=button_hovercolor)
+get_pos_button = Button(get_pos_button_ax, 'Get',
+                    color=button_color, hovercolor=button_hovercolor)
+scan_button = Button(scan_button_ax, 'Scan',
+                     color=button_color, hovercolor=button_hovercolor)
+LABEL_DIRECT = 'Direct'
+LABEL_SHORTEST = 'Shortest'
+radio_button = RadioButtons(
+    radio_button_ax, (LABEL_DIRECT, LABEL_SHORTEST))
+
+set_button.on_clicked(on_set_button_clicked)
+send_instruction_button.on_clicked(on_send_instruction_button_clicked)
+listen_button.on_clicked(on_listen_button_clicked)
+bezier_button.on_clicked(on_bezier_button_clicked)
+stg_button.on_clicked(on_stg_button_clicked)
+get_pos_button.on_clicked(on_get_pos_button_clicked)
+scan_button.on_clicked(on_scan_button_clicked)
+radio_button.on_clicked(on_radio_button_clicked)
+
+use_shortest_path = False
+
+# Connect events
+fig.canvas.mpl_connect('button_press_event', on_mouse_button_press)
+
+update_view()
+
+# Start the matplotlib main
+plt.show()
