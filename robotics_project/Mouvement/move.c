@@ -13,6 +13,8 @@
 
 int16_t move_sequence[3*MAX_MOVES] = {'\0'};
 uint8_t size_move = 0;
+bool STOP = FALSE;
+uint8_t current_move = 0;
 bool running_sequence = FALSE;
 
 // semaphore if sequence has been uploaded
@@ -30,6 +32,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 {
     volatile uint8_t l1,l2,r1,r2,t1,t2;
 	volatile uint16_t i=0;
+	STOP = FALSE;
 
 	if(!running_sequence){
 		set_body_led(0);
@@ -89,13 +92,16 @@ static THD_FUNCTION(moveThread,arg){
 		chBSemWait(&sequence_ready_sem);
 		chThdSleepMilliseconds(500);
 		running_sequence = TRUE;
+		current_move = 0;
 		int16_t lspd = 0;
 		int16_t rspd = 0;
 		int16_t stime = 0;
 		for(uint8_t i = 0; i < (size_move); i++){
+			current_move = i;
 			lspd = move_sequence[i*3];
 			rspd = move_sequence[(i*3)+1];
 			stime = move_sequence[(i*3)+2];
+			if(STOP) break;
 			left_motor_set_speed(lspd);
 			right_motor_set_speed(rspd);
 			//chprintf((BaseSequentialStream *) &SD3,"running %d L %d R %d for %d ms \r\n",i,lspd,rspd,stime);
@@ -103,6 +109,7 @@ static THD_FUNCTION(moveThread,arg){
 		}
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
+		if(!STOP) current_move = 0;
 		//chprintf((BaseSequentialStream *) &SD3,"DONE\r\n");
 		chThdSleepMilliseconds(100);
 		running_sequence = FALSE;
@@ -112,9 +119,16 @@ static THD_FUNCTION(moveThread,arg){
 }
 
 void stop(BaseSequentialStream* out){
+	sequence_override();
 	left_motor_set_speed(0);
 	right_motor_set_speed(0);
+	STOP = TRUE;
 	chprintf(out,"stopped.\r\n");
+}
+
+void sequence_override(void){
+	STOP = TRUE;
+	running_sequence = FALSE;
 }
 
 void scan(BaseSequentialStream* in ,BaseSequentialStream* out){
@@ -127,6 +141,7 @@ void scan(BaseSequentialStream* in ,BaseSequentialStream* out){
 	move_sequence[0] = turnspd;
 	move_sequence[1] = -turnspd;
 	move_sequence[2] = secscan*turns*1000;
+	STOP = FALSE;
 	chBSemSignal(&sequence_ready_sem);
 	chprintf(out,"X%f Y%f P%f\r\n",get_posx(),get_posy(),get_angle());
 	while(!running_sequence){
@@ -138,7 +153,7 @@ void scan(BaseSequentialStream* in ,BaseSequentialStream* out){
 		chprintf(out,"P%f D%i\r\n",ang,dist);
 		chThdSleepMilliseconds(TIMERES);
 	}
-	chprintf(out,"MAP\r\n");
+	chprintf(out,"END\r\n");
 }
 
 void lauch_move_thd(void){

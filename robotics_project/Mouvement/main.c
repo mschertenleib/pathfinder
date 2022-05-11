@@ -16,6 +16,7 @@
 #include <audio/audio_thread.h>
 #include <odometrie.h>
 #include <listen.h>
+#include <obstacle.h>
 #include <process_image.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 
@@ -58,21 +59,22 @@ int main(void) {
 	usb_start();
 	//starts timer 12
 	timer12_start();
+	//process_image_start();
 	//inits the motors
 	motors_init();
 	//init move thread
 	lauch_move_thd();
+	//init tof sensor
 	VL53L0X_start();
-	lauch_odometrie_thd();
-	//process_image_start();
+	lauch_odometrie_thd();	
+	obstacle_detection_init();
+
 
 	set_pos(32,24,0);
 	/* Infinite loop. */
 	while (1) {
-		
 		listen(BTH,BTH);
-		chprintf(BTH,"in Main\r\n");
-		chThdSleepMilliseconds(1000);
+		chThdSleepMilliseconds(100);
 	}
 }
 

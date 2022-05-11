@@ -91,3 +91,24 @@ uint16_t ReceiveInt16FromComputer(BaseSequentialStream* in, float* data, uint16_
 	return temp_size/2;
 
 }
+
+void SendUint8ToComputer(uint8_t* data, uint16_t size) {
+	chSequentialStreamWrite((BaseSequentialStream * )&SD3, (uint8_t* )"START",
+			5);
+	chSequentialStreamWrite((BaseSequentialStream * )&SD3, (uint8_t* )&size,
+			sizeof(uint16_t));
+	chSequentialStreamWrite((BaseSequentialStream * )&SD3, (uint8_t* )data,
+			size);
+}
+
+float ReceiveFloatFromComputer(BaseSequentialStream* in){
+	uint8_t f0,f1,f2,f3;
+	f3 = chSequentialStreamGet(in);
+	f2 = chSequentialStreamGet(in);
+	f1 = chSequentialStreamGet(in);
+	f0 = chSequentialStreamGet(in);
+	uint32_t i = (f0 | f1<<8 | f2<<16 | f3<<24);
+	float* pf = (float*)&i;
+	float f = *pf;
+	return f;
+}

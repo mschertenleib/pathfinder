@@ -3,17 +3,15 @@
 #include <chprintf.h>
 #include <usbcfg.h>
 #include <camera/po8030.h>
-
+#include<communications.h>
 #include <string.h>
 
 #include "main.h"
 #include "process_image.h"
 
-static bool picture = 0;
-
 static BSEMAPHORE_DECL(image_ready_sem, TRUE);
 
-static THD_WORKING_AREA(waCaptureImage, 1024);
+static THD_WORKING_AREA(waCaptureImage, 256);
 static THD_FUNCTION(CaptureImage, arg) {
 
 	chRegSetThreadName(__FUNCTION__);
@@ -26,20 +24,16 @@ static THD_FUNCTION(CaptureImage, arg) {
 	dcmi_prepare();
 
 	while (1) {
-		if(picture){
-			// Start a capture
-			dcmi_capture_start();
-			// Wait for the capture to be done
-			wait_image_ready();
-			// Signal an image has been captured
-			chBSemSignal(&image_ready_sem);
-		}else{
-			chThdSleepMilliseconds(1000);
-		}
+		// Start a capture
+		dcmi_capture_start();
+		// Wait for the capture to be done
+		wait_image_ready();
+		// Signal an image has been captured
+		chBSemSignal(&image_ready_sem);
 	}
 }
 
-static THD_WORKING_AREA(waProcessImage, 1024);
+static THD_WORKING_AREA(waProcessImage, 512);
 static THD_FUNCTION(ProcessImage, arg) {
 
 	chRegSetThreadName(__FUNCTION__);
@@ -50,21 +44,19 @@ static THD_FUNCTION(ProcessImage, arg) {
 	uint8_t current_loop = 0;
 
 	while (1) {
-		if(picture){
-			// Wait until an image has been captured
-			chBSemWait(&image_ready_sem);
 
-			// Get the pointer to the array filled with the last image in RGB565
-			img_buff_ptr = dcmi_get_last_image_ptr();
+		// Wait until an image has been captured
+		chBSemWait(&image_ready_sem);
 
-			if (current_loop == 0) {
-				picture = FALSE;
-				chSequentialStreamWrite((BaseSequentialStream * )&SD3, img_buff_ptr, IMAGE_BUFFER_SIZE);
-			}
-			current_loop = (current_loop + 1) % 16;
-		}else{
-			chThdSleepMilliseconds(1000);
+		// Get the pointer to the array filled with the last image in RGB565
+		img_buff_ptr = dcmi_get_last_image_ptr();
+
+		if (current_loop == 0) {
+			// Send the binary data to the PC
+			SendUint8ToComputer(img_buff_ptr, IMAGE_BUFFER_SIZE);
+			//chSequentialStreamWrite((BaseSequentialStream * )&SD3, img_buff_ptr, IMAGE_BUFFER_SIZE);
 		}
+		current_loop = (current_loop + 1) % 16;
 	}
 }
 
@@ -73,8 +65,4 @@ void process_image_start(void) {
 			ProcessImage, NULL);
 	chThdCreateStatic(waCaptureImage, sizeof(waCaptureImage), NORMALPRIO,
 			CaptureImage, NULL);
-}
-
-void get_picture(void){
-	picture = TRUE;
 }
