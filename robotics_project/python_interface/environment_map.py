@@ -705,7 +705,7 @@ class Environment_map:
         """
         
         # An obstacle is a positive value, a free cell is a 0
-        obstacles = np.ones((self.height, self.width))
+        obstacles = np.ones((self.height, self.width), np.uint8)
         obstacles[self.cells > self.__FREE_THRESHOLD] = 0
         cv2.rectangle(obstacles, (0, 0), (self.width - 1, self.height - 1), 1)
         
@@ -757,7 +757,7 @@ def disk_kernel(radius):
     """
 
     kernel_size = 2 * radius + 1
-    kernel = np.zeros((kernel_size, kernel_size))
+    kernel = np.zeros((kernel_size, kernel_size), np.uint8)
     for x in range(0, kernel_size):
         delta_y = int(np.sqrt(radius * radius - (x - radius) * (x - radius)))
         for y in range(radius - delta_y, radius + delta_y + 1):

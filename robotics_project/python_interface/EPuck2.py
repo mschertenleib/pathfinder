@@ -194,40 +194,30 @@ class EPuck2:
         """
         
         f = open(filename, 'r')
-        while True:
-            command = f.readline()
-            if not command:
-                break
+        command = f.readline()
+        if command[0:5] == '!MOVE':
+            size = int(f.readline())
+            for i in range(size):
+                steps_per_second_left_str, steps_per_second_right_str, time_ms_str = f.readline().split(' ')
+                steps_per_second_left = int(steps_per_second_left_str)
+                steps_per_second_right = int(steps_per_second_right_str)
+                time_ms = int(time_ms_str)
 
-            if command[0:5] == '!MOVE':
-                size = int(int(f.readline()) / 3)
-                if size == 1:
-                    size = 0
-                for i in range(size):
-                    steps_per_second_left_str, steps_per_second_right_str, time_ms_str = f.readline().split(' ')
-                    steps_per_second_left = int(steps_per_second_left_str)
-                    steps_per_second_right = int(steps_per_second_right_str)
-                    time_ms = int(time_ms_str)
+                if not self.is_speed_valid(steps_per_second_left) or not self.is_speed_valid(steps_per_second_right):
+                    print('Invalid speed (>', self.MAX_STEPS_PER_SECOND, '):',
+                            steps_per_second_left, steps_per_second_right)
+                    return
 
-                    if not self.is_speed_valid(steps_per_second_left) or not self.is_speed_valid(steps_per_second_right):
-                        print('Invalid speed (>', self.MAX_STEPS_PER_SECOND, '):',
-                              steps_per_second_left, steps_per_second_right)
-                        return
+                print('Moving', steps_per_second_left,
+                        steps_per_second_right, time_ms)
+                self.move_speed(steps_per_second_left,
+                                steps_per_second_right, time_ms)
 
-                    print('Moving', steps_per_second_left,
-                          steps_per_second_right, time_ms)
-                    self.move_speed(steps_per_second_left,
-                                    steps_per_second_right, time_ms)
-
-            elif command[0:3] == 'END':
-                end_str, supposed_x_str, supposed_y_str = command.split(' ')
-                supposed_x_mm, supposed_y_mm = float(supposed_x_str), float(supposed_y_str)
-                print('Error X:', self.x_mm - supposed_x_mm,
-                      'mm   Y:', self.y_mm - supposed_y_mm, 'mm')
-                break
-            else:
-                print('No commands found')
-                return
+        elif command[0:3] == 'END':
+            end_str, supposed_x_str, supposed_y_str = command.split(' ')
+            supposed_x_mm, supposed_y_mm = float(supposed_x_str), float(supposed_y_str)
+            print('Error X:', self.x_mm - supposed_x_mm,
+                    'mm   Y:', self.y_mm - supposed_y_mm, 'mm')
 
         f.close()
         print(filename, 'Done.')

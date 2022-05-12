@@ -10,9 +10,9 @@ def main():
     height_mm = 800
     cell_size_mm = 10
     
-    ROBOT_RADIUS_MM = EPuck2.Epuck.RADIUS_MM
-    TOF_SENSOR_OFFSET_MM = EPuck2.Epuck.TOF_SENSOR_OFFSET_MM
-    TOF_MAX_DISTANCE_MM = EPuck2.Epuck.TOF_MAX_DISTANCE_MM
+    ROBOT_RADIUS_MM = EPuck2.EPuck2.RADIUS_MM
+    TOF_SENSOR_OFFSET_MM = EPuck2.EPuck2.TOF_SENSOR_OFFSET_MM
+    TOF_MAX_DISTANCE_MM = EPuck2.EPuck2.TOF_MAX_DISTANCE_MM
     WALKABLE_MM = ROBOT_RADIUS_MM * 2
     width_px = width_mm
     height_px = height_mm

@@ -1,3 +1,4 @@
+from turtle import st
 import EPuck2
 import sys
 import numpy as np
@@ -6,10 +7,10 @@ import numpy as np
 def recursive_bezier(points, t):
     if len(points) != 1:
         new_points = []
-        for i in range(len(points)-1):
-            px = points[i][0] + t*(points[i+1][0]-points[i][0])
-            py = points[i][1] + t*(points[i+1][1]-points[i][1])
-            new_points.append([px, py])
+        for i in range(len(points) - 1):
+            px = points[i][0] + t * (points[i + 1][0] - points[i][0])
+            py = points[i][1] + t * (points[i + 1][1] - points[i][1])
+            new_points.append((px, py))
         return recursive_bezier(new_points, t)
     else:
         return points[0]
@@ -45,7 +46,8 @@ def circle_center_from_3_points(p1, p2, p3):
     if w.imag == 0:
         return p1  # if colinear just sends first point
 
-    c = (z2 - z1) * (w - abs(w)**2) / (2j * w.imag) + z1  # Simplified denominator
+    c = (z2 - z1) * (w - abs(w)**2) / \
+        (2j * w.imag) + z1  # Simplified denominator
 
     return (c.real, c.imag)
 
@@ -67,12 +69,22 @@ class Move:
             ys_mm.append(y_mm)
         ax.plot(xs_mm, ys_mm, color=color)
 
-    def gen_stg_command(self, time_ms, current_robot_angle_rad):
+    def gen_straight_command(self, distance_mm, steps_per_second):
+        distance_steps = distance_mm / EPuck2.EPuck2.MM_PER_STEP
+        duration_ms = int(distance_steps / steps_per_second * 1000)
+        self.command.append(
+            (int(steps_per_second), int(steps_per_second), duration_ms))
 
-        number_comms = (len(self.data) - 1) * 2
-        ms_per_move_step = int(time_ms / number_comms)
-        print('STG over', time_ms, 'ms,', len(self.data), 'points,',
-              number_comms, 'comms,', ms_per_move_step, 'ms per move step')
+    def gen_in_place_turn_command(self, angle_rad, steps_per_second):
+        travel_mm = EPuck2.EPuck2.WHEEL_SPACING_MM / 2 * abs(angle_rad)
+        travel_steps = travel_mm / EPuck2.EPuck2.MM_PER_STEP
+        duration_ms = int(travel_steps / steps_per_second * 1000)
+        steps_per_second_left = -int(steps_per_second) if angle_rad > 0 else int(steps_per_second)
+        steps_per_second_right = int(steps_per_second) if angle_rad > 0 else -int(steps_per_second)
+        self.command.append(
+            (steps_per_second_left, steps_per_second_right, duration_ms))
+
+    def gen_stg_command(self, steps_per_second, current_robot_angle_rad):
 
         self.command.clear()
 
@@ -80,27 +92,17 @@ class Move:
 
             # Turning phase
             if i == 0:
-                angle_rad = angle_points(
-                    (0, 0), (np.cos(current_robot_angle_rad), np.sin(current_robot_angle_rad)), self.data[0], self.data[1])
+                angle_rad = angle_points((0, 0), (np.cos(current_robot_angle_rad), np.sin(
+                    current_robot_angle_rad)), self.data[0], self.data[1])
             else:
                 angle_rad = angle_points(
-                    self.data[i-1], self.data[i], self.data[i], self.data[i+1])
+                    self.data[i - 1], self.data[i], self.data[i], self.data[i + 1])
 
-            left_mm = -EPuck2.EPuck2.WHEEL_SPACING_MM / 2 * angle_rad
-            right_mm = EPuck2.EPuck2.WHEEL_SPACING_MM / 2 * angle_rad
-            left_steps = left_mm / EPuck2.EPuck2.MM_PER_STEP
-            right_steps = right_mm / EPuck2.EPuck2.MM_PER_STEP
-            left_steps_per_second = int(left_steps * 1000 / ms_per_move_step)
-            right_steps_per_second = int(right_steps * 1000 / ms_per_move_step)
-            self.command.append(
-                (left_steps_per_second, right_steps_per_second, ms_per_move_step))
+            self.gen_in_place_turn_command(angle_rad, steps_per_second)
 
             # Forward phase
-            distance_mm = dist(self.data[i], self.data[i+1])
-            distance_steps = distance_mm / EPuck2.EPuck2.MM_PER_STEP
-            steps_per_second = int(distance_steps * 1000 / ms_per_move_step)
-            self.command.append(
-                (steps_per_second, steps_per_second, ms_per_move_step))
+            self.gen_straight_command(
+                dist(self.data[i], self.data[i + 1]), steps_per_second)
 
     def gen_bezier_path(self, steps):
         steps *= (len(self.data) - 1)
@@ -117,12 +119,12 @@ class Move:
             acc += dist(self.path[i], self.path[i+1])
         return acc
 
-    def genfile(self, filename):
+    def gen_file(self, filename):
         f = open(filename, 'w')
         original_stdout = sys.stdout
         sys.stdout = f  # Change the standard output to the file we created.
         print('!MOVE')
-        nb_word = len(self.command)*3
+        nb_word = len(self.command)
         print(nb_word)
 
         for step in self.command:
@@ -133,44 +135,44 @@ class Move:
         print('END %.2f %.2f' % (self.data[-1][0], self.data[-1][1]))
         sys.stdout = original_stdout  # Reset the standard output to its original value
 
-    def gen_bez_command(self, time):
+    def gen_bez_command(self, steps_per_second, current_robot_angle_rad):
         self.command.clear()
-        timestep = (int)(time/((len(self.path)/2 - 1)))
-        
-        SPCM = 10 / EPuck2.EPuck2.MM_PER_STEP
-        WHEEL_SPACE_CM = EPuck2.EPuck2.WHEEL_SPACING_MM / 10
 
-        for i in range(0, len(self.path)-2, 2):
+        if len(self.path) <= 2:
+            return
+
+        angle_rad = angle_points((0, 0), (np.cos(current_robot_angle_rad), np.sin(
+            current_robot_angle_rad)), self.path[0], self.path[1])
+        self.gen_in_place_turn_command(angle_rad, steps_per_second)
+
+        for i in range(0, len(self.path) - 2, 2):
             center = circle_center_from_3_points(
-                self.path[i], self.path[i+1], self.path[i+2])
-            if(center == self.path[i]):  # if goes straight
-                Rtrav = dist(self.path[i], self.path[i+2])
-                Ltrav = int(Rtrav*SPCM*(1000/timestep))
-                self.command.append((Ltrav, Ltrav, timestep))
+                self.path[i], self.path[i + 1], self.path[i + 2])
+
+            if center == self.path[i]:  # If goes straight
+                self.gen_straight_command(
+                    dist(self.path[i], self.path[i + 2]), steps_per_second)
 
             else:
                 rad = dist(self.path[i], center)
                 angle = 2 * \
-                    np.arcsin((dist(self.path[i], self.path[i+2]))/(2*rad))
-                #print("angle = {:.2f}deg".format(angle*(180/np.pi)))
-                # vect perp au deux premier point dir droite
-                Pvect = ((self.path[i+1][1]-self.path[i][1]), -
-                         (self.path[i+1][0]-self.path[i][0]))
-                Rvect = (center[0]-self.path[i][0], center[1] -
-                         self.path[i][1])  # vect point i in center
+                    np.arcsin((dist(self.path[i], self.path[i+2])) / (2 * rad))
+                # Vector perpendicular to the first two points, pointing to the right
+                Pvect = ((self.path[i + 1][1] - self.path[i][1]
+                          ), -(self.path[i + 1][0] - self.path[i][0]))
+                # Vector from point i to center
+                Rvect = (center[0] - self.path[i][0],
+                         center[1] - self.path[i][1])
 
-                if np.dot(Pvect, Rvect) > 0:  # determine si centre a droite
-                    Rtrav = (rad - (WHEEL_SPACE_CM/2))*angle
-                    Ltrav = (rad + (WHEEL_SPACE_CM/2))*angle
-                    a = (int)(Ltrav*SPCM*(1000/timestep))
-                    b = (int)(Rtrav*SPCM*(1000/timestep))
-                    c = timestep
-                    self.command.append((a, b, c))
+                if np.dot(Pvect, Rvect) > 0: # Center to the right
+                    Rtrav_mm = (rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+                    Ltrav_mm = (rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
 
-                else:                                                          # ou gauche
-                    Rtrav = (rad + (WHEEL_SPACE_CM/2))*angle
-                    Ltrav = (rad - (WHEEL_SPACE_CM/2))*angle
-                    a = (int)(Ltrav*SPCM*(1000/timestep))
-                    b = (int)(Rtrav*SPCM*(1000/timestep))
-                    c = timestep
-                    self.command.append((a, b, c))
+                else: # Center to the left
+                    Rtrav_mm = (rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+                    Ltrav_mm = (rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+                
+                duration_ms = 30000 / len(self.path)
+                steps_per_second_left = int(Ltrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
+                steps_per_second_right = int(Rtrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
+                self.command.append((steps_per_second_left, steps_per_second_right, duration_ms))

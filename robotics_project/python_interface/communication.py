@@ -30,46 +30,49 @@ def open_port(port: str):
 
 def beep(ser: serial.Serial, frequency_Hz: int):
     ser.write('!BEEP'.encode('ascii'))
-    ser.write(struct.pack('>h', frequency_Hz))
+    ser.write(struct.pack('<h', frequency_Hz))
 
 
 def clean_and_set(ser: serial.Serial, x_mm, y_mm, angle_rad):
     ser.write('!CLR'.encode('ascii'))
-    ser.write(struct.pack('>f', x_mm / 10))
-    ser.write(struct.pack('>f', y_mm / 10))
-    ser.write(struct.pack('>f', angle_rad))
+    ser.write(struct.pack('<f', x_mm / 10))
+    ser.write(struct.pack('<f', y_mm / 10))
+    ser.write(struct.pack('<f', angle_rad))
 
 
 def move_robot(ser: serial.Serial, move: move.Move):
     ser.write('!MOVE'.encode('ascii'))
 
     num_moves = len(move.command)
-    num_values = num_moves * 3
-    ser.write(struct.pack('>h', num_values))
+    ser.write(struct.pack('<h', num_moves))
 
     for movement_step in move.command:
         for value in movement_step:
-            ser.write(struct.pack('>h', value))
+            ser.write(struct.pack('<h', value))
     
     ser.write('END'.encode('ascii'))
 
-    print(f'Sent !MOVE: {num_moves} moves\r\n{move.command}')
+    print(f'Sent !MOVE: {num_moves} moves: {move.command}')
 
 
 def acquire_image(ser: serial.Serial):
     # Send command
     ser.write('!PIC'.encode('ascii'))
 
-    # Receive image data. First the size of the buffer as uint16, then the pixel data as rgb565
-    buffer_size = struct.unpack('>H', ser.read(2))[0]
+    width_bytes = ser.read(2)
+    image_width = struct.unpack('<H', width_bytes)[0]
+    height_bytes = ser.read(2)
+    image_height = struct.unpack('<H', height_bytes)[0]
+    buffer_size = image_width * image_height * 2
+    
     rcv_buffer = ser.read(buffer_size)
 
     image = []
 
-    if len(rcv_buffer) == buffer_size:
+    if len(rcv_buffer) != buffer_size:
         print(
             f'Expected {buffer_size} bytes of image data, received {len(rcv_buffer)}')
-        return []
+        return
 
     # If we received the good amount of data, we convert them
     for i in range(0, buffer_size, 2):
@@ -79,7 +82,7 @@ def acquire_image(ser: serial.Serial):
         image.append(rgb)
 
     print('Image received !')
-    return image
+    return (image_width, image_height, image)
 
 
 def get_robot_pos(ser: serial.Serial):
@@ -87,39 +90,42 @@ def get_robot_pos(ser: serial.Serial):
     ser.write('!POS'.encode('ascii'))
 
     # Receive robot data
-    robot_x_mm = struct.unpack('>f', ser.read(4))[0] * 10
-    robot_y_mm = struct.unpack('>f', ser.read(4))[0] * 10
-    robot_angle_rad = struct.unpack('>f', ser.read(4))[0] * 10
+    robot_x_mm = struct.unpack('<f', ser.read(4))[0] * 10
+    robot_y_mm = struct.unpack('<f', ser.read(4))[0] * 10
+    robot_angle_rad = struct.unpack('<f', ser.read(4))[0]
     return (robot_x_mm, robot_y_mm, robot_angle_rad)
 
 
-def scan(ser: serial.Serial):
+def request_scan(ser: serial.Serial):
     ser.write('!SCAN'.encode('ascii'))
-    TURNS = 1
-    ser.write(struct.pack('>B', TURNS))
+    
+    data_bytes = ser.read(12)
+    if len(data_bytes) != 12:
+        print(f'Read only {len(data_bytes)} out of 12 in request_scan')
+        return
+    
+    robot_x_mm = struct.unpack('<f', data_bytes[0:4])[0] * 10
+    robot_y_mm = struct.unpack('<f', data_bytes[4:8])[0] * 10
+    robot_angle_rad = struct.unpack('<f', data_bytes[8:12])[0]
+    return (robot_x_mm, robot_y_mm, robot_angle_rad)
 
-    i = 0
-    ret = str()
-    time = 1e6
-    while i < time:
-        bytesToRead = ser.inWaiting()
-        serstr = ser.read(bytesToRead)
-        if serstr != b'':
-            i = 0
-            ascii_string = serstr.decode('ascii')
-            print(ascii_string)
-            if len(ret) == 0 and ascii_string.find('SCAN') != 0:
-                print('Unexpected bytes received')
-                return str()
 
-            ret += ascii_string
-            if ascii_string.find('END') != -1:
-                break
-        else:
-            i += 1
-    print('stopped listening.', i)
-    ser.close()
-    return ret
+def scan_generator(ser: serial.Serial):
+
+    while True:
+        data_bytes = ser.read(6)
+        
+        if len(data_bytes) != 6:
+            print(f'Read only {len(data_bytes)} out of 6 in get_next_scan')
+            return
+        
+        # Stop condition
+        if data_bytes == bytes([0xff] * 6):
+            return
+        
+        angle_rad = struct.unpack('<f', data_bytes[0:4])[0]
+        distance_mm = struct.unpack('<H', data_bytes[4:6])[0]
+        yield angle_rad, distance_mm
 
 
 def stop_robot(ser: serial.Serial):
@@ -137,7 +143,7 @@ def send_instruction_file(ser: serial.Serial, filename: str):
         frequency_Hz = int(frequency_strings[0])
         beep(ser, frequency_Hz)
         
-    elif instruction.find('!CLS') != -1:
+    elif instruction.find('!CLR') != -1:
         data_strings = file.readline().split()
         x_mm = float(data_strings[0])
         y_mm = float(data_strings[1])
@@ -148,7 +154,7 @@ def send_instruction_file(ser: serial.Serial, filename: str):
         size_string = file.readline().split()
         size = int(size_string[0])
         move_to_send = move.Move(0, 0)
-        for i in range(size // 3):
+        for i in range(size):
             data_strings = file.readline().split()
             speed_left = int(data_strings[0])
             speed_right = int(data_strings[1])
@@ -167,60 +173,6 @@ def send_instruction_file(ser: serial.Serial, filename: str):
     
     elif instruction.find('!STOP') != -1:
         stop_robot(ser)
-
-
-def send_move_instruction_file(ser: serial.Serial, filename: str):
-
-    file = open(filename, 'r')
-
-    command = []
-
-    instr = file.readline().rstrip('\n')
-    len = int(file.readline().rstrip('\n'))
-    for i in range(len):
-        for inf in file.readline().split():
-            if(inf == 'END'):
-                print('Finished reading', filename)
-                break
-            command.append(int(inf))
-
-    for c in instr:  # send instr like "MOVE"
-        ser.write(c.encode('utf-8'))
-
-    time.sleep(1)  # send size of data
-    ser.write(struct.pack('>h', len))
-
-    for inf in command:  # sends data
-        ser.write(struct.pack('>h', inf))
-
-    for c in "END":
-        ser.write(c.encode('utf-8'))
-
-    print("sent:", instr, len, command)
-    confirm = ser.read(1).decode('ascii')
-    print(confirm)
-    if(confirm == 'c'):
-        print(' Confirmed !')
-    else:
-        print(' EPuck didn\'t listen. again. ')
-    ser.close()
-
-
-def listen_serial(ser: serial.Serial, time):
-    i = 0
-    while i < time:
-        bytesToRead = ser.inWaiting()
-        serstr = ser.read(bytesToRead)
-        if serstr != b'':
-            i = 0
-            ret = serstr.decode("ascii")
-            print("->", ret)
-            if ret.find("DONE") != -1:
-                break
-        else:
-            i += 1
-    print("stopped listening.", i)
-    ser.close()
 
 
 def rgb565_to_rgb888(rgb565):
