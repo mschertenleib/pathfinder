@@ -63,14 +63,23 @@ void lauch_odometrie_thd(void){
 }
 
 void measure_and_add(float* pos, int mlc, int mrc){
+
+	float angle_inc =compute_phi(mlc,mrc);
+	pos[2] = fmod((pos[2]+angle_inc),M_TWOPI);
+	float dist_inc = compute_dist(mlc,mrc,pos[2]);
+	pos[0] += dist_inc*cosf(pos[2]);
+	pos[1] += dist_inc*sinf(pos[2]);
+
+	/*
     short cdiv = pgdc(mlc,mrc);
     short dl = mlc/cdiv;
     short dr = mrc/cdiv;
     float dangle =compute_phi(dl,dr);
-    pos[2] += dangle;
+    pos[2] = (pos[2]+dangle)%M_TWOPI;
     float ddist = compute_dist(dl,dr,pos[2]);
     pos[0] += ddist*sinf(pos[2]);
     pos[1] += ddist*cosf(pos[2]);
+    */
 }
 
 // internal functions
@@ -87,7 +96,12 @@ short pgdc(short a,short b){
 }
 
 float compute_phi(short l, short r){
-    short op = 0;
+
+	short diff = l - r;
+	return atan2f((float)diff*CMPSTEP,RBTWIDTHCM);
+
+	/*
+	short op = 0;
     if(l == r){
         return 0;
     }
@@ -98,7 +112,7 @@ float compute_phi(short l, short r){
     else if (r > l){
         op = r-l;
         return -atanf( ((float)op*CMPSTEP) / RBTWIDTHCM );
-    }
+    }*/
 }
 
 float compute_dist(short l, short r, float ang){

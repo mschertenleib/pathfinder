@@ -11,7 +11,7 @@ void stop(BaseSequentialStream* out);
 
 void sequence_override(void);
 
-void scan(BaseSequentialStream* in ,BaseSequentialStream* out);
+void scan(BaseSequentialStream* out);
 
 void lauch_move_thd(void);
 

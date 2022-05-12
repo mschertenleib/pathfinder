@@ -7,8 +7,6 @@
 #define NBMEAS 3
 #define FLWSPD 100
 
-enum side{left,right};
-
 void obstacle_detection_init(void);
 
 int spdP(int meas);

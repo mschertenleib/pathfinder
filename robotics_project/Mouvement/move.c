@@ -3,9 +3,10 @@
 #include "leds.h"
 #include <motors.h>
 #include <usbcfg.h>
+#include <math.h>
 #include <chprintf.h>
 #include <sensors/VL53L0X/VL53L0X.h>
-
+#include <communications.h>
 #include <odometrie.h>
 #include <main.h>
 
@@ -123,7 +124,7 @@ void stop(BaseSequentialStream* out){
 	left_motor_set_speed(0);
 	right_motor_set_speed(0);
 	STOP = TRUE;
-	chprintf(out,"stopped.\r\n");
+	//chprintf(out,"stopped.\r\n");
 }
 
 void sequence_override(void){
@@ -131,29 +132,31 @@ void sequence_override(void){
 	running_sequence = FALSE;
 }
 
-void scan(BaseSequentialStream* in ,BaseSequentialStream* out){
+void scan(BaseSequentialStream* out){
 	set_body_led(0);
-	volatile uint8_t turns = chSequentialStreamGet(in);
-	float ang = get_angle();
-	int16_t dist;
-	int turnspd = (int)(3.14159265359*RBTWIDTHCM*1000)/(13*secscan);
+	float ang;
+	uint16_t dist;
+	int turnspd = (int)(M_PI*RBTWIDTHCM*1000)/(13.0f*secscan);
 	size_move = 1;
 	move_sequence[0] = turnspd;
 	move_sequence[1] = -turnspd;
-	move_sequence[2] = secscan*turns*1000;
+	move_sequence[2] = secscan*1100;
 	STOP = FALSE;
 	chBSemSignal(&sequence_ready_sem);
-	chprintf(out,"X%f Y%f P%f\r\n",get_posx(),get_posy(),get_angle());
+	SendFloatToComputer(out,get_posx());
+	SendFloatToComputer(out,get_posy());
+	SendFloatToComputer(out,get_angle());
 	while(!running_sequence){
 		chThdSleepMilliseconds(100);
 	}
 	while(running_sequence){
 		ang = get_angle();
 		dist = VL53L0X_get_dist_mm();
-		chprintf(out,"P%f D%i\r\n",ang,dist);
+		SendFloatToComputer(out,ang);
+		SendUint16ToComputer(out,dist);
 		chThdSleepMilliseconds(TIMERES);
 	}
-	chprintf(out,"END\r\n");
+	chprintf(out,"END");
 }
 
 void lauch_move_thd(void){

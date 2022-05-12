@@ -13,7 +13,6 @@
 
 bool too_close = FALSE;
 bool interrupted = FALSE;
-enum side flwside = right;
 
 static THD_WORKING_AREA(obstacleThreadArea,512);
 static THD_FUNCTION(obstacleThread,arg){
@@ -37,8 +36,7 @@ static THD_FUNCTION(obstacleThread,arg){
         if(front_left > IR_THRESHOLD-50) too_close = TRUE;
         if(back_right > IR_THRESHOLD-50) too_close = TRUE;
         if(back_right > IR_THRESHOLD-50) too_close = TRUE;
-        //chprintf((BaseSequentialStream* ) &SD3,"%i\r\n",right);
-        //chprintf((BaseSequentialStream* ) &SD3,"update ir front: %i back: %i\r\n",(front_left+front_right)/2,(back_left + back_right)/2);
+
         if(too_close){
         
             if((back_left + back_right)/2 > IR_THRESHOLD){
@@ -46,8 +44,8 @@ static THD_FUNCTION(obstacleThread,arg){
                 if(cumulF >= SAMPLE_FILTER){
                     interrupted = TRUE;
                     sequence_override();
-                    left_motor_set_speed(spdPI((back_left + back_right)/2));
-                    right_motor_set_speed(spdPI((back_left + back_right)/2));
+                    left_motor_set_speed(spdP((back_left + back_right)/2));
+                    right_motor_set_speed(spdP((back_left + back_right)/2));
                     //chThdSleepMilliseconds(100);
                     }
             }else{cumulF = 0;}
@@ -57,8 +55,8 @@ static THD_FUNCTION(obstacleThread,arg){
                 if(cumulB >= SAMPLE_FILTER){
                     interrupted = TRUE;
                     sequence_override();
-                    left_motor_set_speed(-spdPI((front_left + front_right)/2));
-                    right_motor_set_speed(-spdPI((front_left + front_right)/2));
+                    left_motor_set_speed(-spdP((front_left + front_right)/2));
+                    right_motor_set_speed(-spdP((front_left + front_right)/2));
                     //chThdSleepMilliseconds(100);
                 }
             }else{cumulB = 0;}
@@ -73,15 +71,13 @@ static THD_FUNCTION(obstacleThread,arg){
     }
 }
 
-int spdPI(int meas){
+int spdP(int meas){
     int err = (IR_THRESHOLD - meas);
-    //chprintf((BaseSequentialStream* ) &SD3,"meas %i err %i\r\n",meas,err);
     return -(err);
 }
 
 void obstacle_detection_init(void){
-    proximity_start();
-    calibrate_ir();
+	calibrate_ir();
     chThdCreateStatic(obstacleThreadArea,
 							  sizeof(obstacleThreadArea),
 							  NORMALPRIO,
