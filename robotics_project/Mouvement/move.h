@@ -3,6 +3,7 @@
 
 #define MAX_MOVES 100
 #define secscan 19
+#define TOFRR 100
 // External functions
 
 void ReceiveSpeedInstMove(BaseSequentialStream* in,BaseSequentialStream* out);

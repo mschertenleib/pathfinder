@@ -143,14 +143,17 @@ void scan(BaseSequentialStream* out){
 		SendFloatToComputer(out,get_angle());
 		while(!running_sequence  || (ang == start_ang)){
 			chThdSleepMilliseconds(100);
+			ang = get_angle();
 		}
-		while(running_sequence){
+		while(running_sequence && (ang != start_ang)){
 			ang = get_angle();
 			dist = VL53L0X_get_dist_mm();
 			SendFloatToComputer(out,ang);
 			SendUint16ToComputer(out,dist);
-			chThdSleepMilliseconds(TIMERES);
+			//chprintf(out,"sent %f %i.\r\n",ang,dist);
+			chThdSleepMilliseconds(TOFRR);
 		}
+		if(running_sequence) stop();
 		SendUint16ToComputer(out,0xffff);
 	}
 }
