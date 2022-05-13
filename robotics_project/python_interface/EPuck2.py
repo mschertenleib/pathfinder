@@ -7,15 +7,16 @@ class EPuck2:
     Class representing the e-puck2 robot, its physical dimensions, and offering a set of methods used to simulate the robot
     """
 
-    RADIUS_MM = 36.5
-    WHEEL_SPACING_MM = 54
-    WHEEL_DIAMETER_MM = 41
+    DIAMETER_MM = 73.8
+    RADIUS_MM = DIAMETER_MM / 2
+    WHEEL_SPACING_MM = 53.7
+    WHEEL_DIAMETER_MM = 41.3
     WHEEL_CIRCUMFERENCE_MM = np.pi * WHEEL_DIAMETER_MM
     STEPS_PER_TURN = 1000
     MM_PER_STEP = WHEEL_CIRCUMFERENCE_MM / STEPS_PER_TURN
     MAX_STEPS_PER_SECOND = 1000
     CAM_FOV_RAD = np.pi / 4
-    TOF_SENSOR_OFFSET_MM = RADIUS_MM  # Distance from robot center to TOF sensor
+    TOF_SENSOR_OFFSET_MM = RADIUS_MM - 1.8  # Distance from robot center to TOF sensor
     TOF_MAX_DISTANCE_MM = 2000
 
     def __init__(self, x_mm=0, y_mm=0, angle_rad=0):
@@ -161,8 +162,8 @@ class EPuck2:
             pys_mm = turn_center_y_mm - turn_radius_mm * np.cos(angles_rad)
             for i in range(num_points):
                 self.trail.append((pxs_mm[i], pys_mm[i], angles_rad[i]))
-            self.x_mm = pxs_mm[num_points - 1]
-            self.y_mm = pys_mm[num_points - 1]
+            self.x_mm = pxs_mm[-1]
+            self.y_mm = pys_mm[-1]
             self.angle_rad = end_angle
 
     def move_speed(self, steps_per_second_left, steps_per_second_right, duration_ms):

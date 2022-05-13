@@ -8,13 +8,13 @@ import numpy as np
 
 
 """
-!BEEP <frequency_hz>            Emit sound at given frequency for 100ms
-!CLR <x_cm> <y_cm> <angle_rad>  Set position, clean movement buffer on the robot
-!MOVE <size> <data>             Give a set of moves
-!PIC                            Ask for an image
-!POS                            Get current position
-!SCAN <turns>                   Turn in place while getting distance readings
-!STOP                           Stop motors, clean movement buffer on the robot
+!BEEP <frequency_hz>                Emit sound at given frequency for 100ms
+!CLR <x_cm> <y_cm> <angle_rad>      Set position, clean movement buffer on the robot
+!MOVE <num_moves> <<move_data>...>  Give a set of moves
+!PIC                                Ask for an image
+!POS                                Get current position
+!SCAN                               Turn in place while getting distance readings
+!STOP                               Stop motors, clean movement buffer on the robot
 """
 
 
@@ -162,17 +162,8 @@ def send_instruction_file(ser: serial.Serial, filename: str):
             move_to_send.command.append((speed_left, speed_right, duration))
         move_robot(ser, move_to_send)
         
-    elif instruction.find('!PIC') != -1:
-        return acquire_image(ser)
-    
-    elif instruction.find('!POS') != -1:
-        return get_robot_pos(ser)
-    
-    elif instruction.find('!SCAN') != -1:
-        return scan(ser)
-    
-    elif instruction.find('!STOP') != -1:
-        stop_robot(ser)
+    else:
+        print('Unknown or unsupported command in instruction file')
 
 
 def rgb565_to_rgb888(rgb565):

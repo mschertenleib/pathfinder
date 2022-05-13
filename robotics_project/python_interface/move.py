@@ -1,4 +1,3 @@
-from turtle import st
 import EPuck2
 import sys
 import numpy as np
@@ -16,13 +15,17 @@ def recursive_bezier(points, t):
         return points[0]
 
 
-def angle_points(a0, a1, b0, b1):
-    v1 = np.subtract(a1, a0)
-    v2 = np.subtract(b1, b0)
+def angle_vecs(v1, v2):
     if np.dot(v1, (v2[1], -v2[0])) >= 0:
         return np.arccos(np.dot(v1, v2) / (norm(v1) * norm(v2)))
     else:
         return -np.arccos(np.dot(v1, v2) / (norm(v1) * norm(v2)))
+
+
+def angle_points(a0, a1, b0, b1):
+    v1 = np.subtract(a1, a0)
+    v2 = np.subtract(b1, b0)
+    return angle_vecs(v1, v2)
 
 
 def norm(vect):
@@ -79,10 +82,34 @@ class Move:
         travel_mm = EPuck2.EPuck2.WHEEL_SPACING_MM / 2 * abs(angle_rad)
         travel_steps = travel_mm / EPuck2.EPuck2.MM_PER_STEP
         duration_ms = int(travel_steps / steps_per_second * 1000)
-        steps_per_second_left = -int(steps_per_second) if angle_rad > 0 else int(steps_per_second)
-        steps_per_second_right = int(steps_per_second) if angle_rad > 0 else -int(steps_per_second)
+        steps_per_second_left = - \
+            int(steps_per_second) if angle_rad > 0 else int(steps_per_second)
+        steps_per_second_right = int(
+            steps_per_second) if angle_rad > 0 else -int(steps_per_second)
         self.command.append(
             (steps_per_second_left, steps_per_second_right, duration_ms))
+
+    def gen_turn_command(self, radius_mm, angle_rad, steps_per_second):
+        # NOTE: A positive radius means the turn is to the right
+        
+        distance_center_mm = radius_mm * angle_rad
+        
+        if radius_mm >= 0:
+            distance_left_mm = (radius_mm + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
+            distance_right_mm = (radius_mm - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
+        else:
+            distance_left_mm = (radius_mm - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
+            distance_right_mm = (radius_mm + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
+
+        distance_center_steps = distance_center_mm / EPuck2.EPuck2.MM_PER_STEP
+        distance_left_steps = distance_left_mm / EPuck2.EPuck2.MM_PER_STEP
+        distance_right_steps = distance_right_mm / EPuck2.EPuck2.MM_PER_STEP
+        duration_s = abs(distance_center_steps / steps_per_second)
+        steps_per_second_left = int(distance_left_steps / duration_s)
+        steps_per_second_right = int(distance_right_steps / duration_s)
+        duration_ms = int(duration_s * 1000)
+        self.command.append((steps_per_second_left, steps_per_second_right, duration_ms))
+
 
     def gen_stg_command(self, steps_per_second, current_robot_angle_rad):
 
@@ -103,6 +130,26 @@ class Move:
             # Forward phase
             self.gen_straight_command(
                 dist(self.data[i], self.data[i + 1]), steps_per_second)
+
+    def gen_smooth_turn_command(self, steps_per_second, current_robot_angle_rad):
+
+        self.command.clear()
+
+        # First align with the direction of the first segment
+        angle_rad = angle_points((0, 0), (np.cos(current_robot_angle_rad), np.sin(
+            current_robot_angle_rad)), self.data[0], self.data[1])
+        self.gen_in_place_turn_command(angle_rad, steps_per_second)
+
+        for i in range(1, len(self.data) - 1):
+            vec_segment_1 = np.subtract(self.data[i], self.data[i - 1])
+            vec_segment_2 = np.subtract(self.data[i + 1], self.data[i])
+            length_segment_1_mm = norm(vec_segment_1)
+            length_segment_2_mm = norm(vec_segment_2)
+            max_tangent_length_mm = min(
+                length_segment_1_mm / 2, length_segment_2_mm / 2)
+            angle_rad = angle_vecs(vec_segment_1, vec_segment_2)
+            turn_radius_mm = max_tangent_length_mm * np.tan(angle_rad / 2)
+            self.gen_turn_command(turn_radius_mm, angle_rad, steps_per_second)
 
     def gen_bezier_path(self, steps):
         steps *= (len(self.data) - 1)
@@ -141,6 +188,7 @@ class Move:
         if len(self.path) <= 2:
             return
 
+        # First align with the direction of the first segment
         angle_rad = angle_points((0, 0), (np.cos(current_robot_angle_rad), np.sin(
             current_robot_angle_rad)), self.path[0], self.path[1])
         self.gen_in_place_turn_command(angle_rad, steps_per_second)
@@ -164,15 +212,22 @@ class Move:
                 Rvect = (center[0] - self.path[i][0],
                          center[1] - self.path[i][1])
 
-                if np.dot(Pvect, Rvect) > 0: # Center to the right
-                    Rtrav_mm = (rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
-                    Ltrav_mm = (rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+                if np.dot(Pvect, Rvect) > 0:  # Center to the right
+                    Rtrav_mm = (
+                        rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+                    Ltrav_mm = (
+                        rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
 
-                else: # Center to the left
-                    Rtrav_mm = (rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
-                    Ltrav_mm = (rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
-                
-                duration_ms = 30000 / len(self.path)
-                steps_per_second_left = int(Ltrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
-                steps_per_second_right = int(Rtrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
-                self.command.append((steps_per_second_left, steps_per_second_right, duration_ms))
+                else:  # Center to the left
+                    Rtrav_mm = (
+                        rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+                    Ltrav_mm = (
+                        rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+
+                duration_ms = int(30000 / len(self.path)) * 2
+                steps_per_second_left = int(
+                    Ltrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
+                steps_per_second_right = int(
+                    Rtrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
+                self.command.append(
+                    (steps_per_second_left, steps_per_second_right, duration_ms))

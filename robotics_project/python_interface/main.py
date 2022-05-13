@@ -9,14 +9,10 @@ import serial
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button, RadioButtons, TextBox
+from matplotlib.widgets import Button, RadioButtons
 from matplotlib.backend_bases import MouseButton
 import matplotlib
 matplotlib.use('TkAgg')
-
-
-APRPP = 10  # nb approx per line for bezier
-instrfile = 'instructions.txt'
 
 
 def on_set_button_clicked(event):
@@ -24,14 +20,14 @@ def on_set_button_clicked(event):
     robot.angle_rad = 0
     current_move.reset_data(robot.x_mm, robot.y_mm)
 
-    if ser.is_open:
+    if ser and ser.is_open:
         comm.clean_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
 
     update_view()
 
 
 def on_get_button_clicked(event):
-    if ser.is_open:
+    if ser and ser.is_open:
         robot.x_mm, robot.y_mm, robot.angle_rad = comm.get_robot_pos(ser)
         print('Get pos:', robot.x_mm, robot.y_mm, robot.angle_rad)
         current_move.reset_data(robot.x_mm, robot.y_mm)
@@ -40,18 +36,19 @@ def on_get_button_clicked(event):
 
 
 def on_send_instruction_button_clicked(event):
-    if ser.is_open:
-        comm.send_instruction_file(ser, instrfile)
+    if ser and ser.is_open:
+        comm.send_instruction_file(ser, instruction_file)
 
 
 def test_scan_generator(ser):
     for i in range(100):
-        angle_rad = i / 100 * 2* np.pi
+        angle_rad = i / 100 * 2 * np.pi
         distance_mm = 250 + 100 * np.sin(4*angle_rad)
         yield angle_rad, distance_mm
 
+
 def on_scan_button_clicked(event):
-    if ser.is_open:
+    if ser and ser.is_open:
         res = comm.request_scan(ser)
         if res is None:
             return
@@ -70,15 +67,16 @@ def on_scan_button_clicked(event):
 def on_bezier_button_clicked(event):
     print('Generating Bezier command')
 
-    current_move.gen_bezier_path(APRPP)
+    APPROX_PER_LINE = 3
+    current_move.gen_bezier_path(APPROX_PER_LINE)
     current_move.gen_bez_command(STEPS_PER_SECOND, robot.angle_rad)
-    current_move.gen_file(instrfile)
+    current_move.gen_file(instruction_file)
 
     robot.trail = []
 
-    robot.read_command_file(instrfile)
+    robot.read_command_file(instruction_file)
 
-    if ser.is_open:
+    if ser and ser.is_open:
         comm.move_robot(ser, current_move)
 
     update_view()
@@ -90,13 +88,35 @@ def on_stg_button_clicked(event):
     print('Generating Stop-Turn-Go command')
 
     current_move.gen_stg_command(STEPS_PER_SECOND, robot.angle_rad)
-    current_move.gen_file(instrfile)
+    current_move.gen_file(instruction_file)
 
     robot.trail = []
 
-    robot.read_command_file(instrfile)
+    robot.read_command_file(instruction_file)
 
-    if ser.is_open:
+    if ser and ser.is_open:
+        comm.move_robot(ser, current_move)
+
+    update_view()
+
+    current_move.reset_data(robot.x_mm, robot.y_mm)
+
+def on_smooth_turn_button_clicked(event):
+    print('Generating smooth turn command')
+
+    #current_move.gen_smooth_turn_command(STEPS_PER_SECOND, robot.angle_rad)
+    current_move.gen_turn_command(100, np.pi/2, STEPS_PER_SECOND)
+    current_move.gen_turn_command(100, -np.pi/2, STEPS_PER_SECOND)
+    current_move.gen_turn_command(100, np.pi/2, -STEPS_PER_SECOND)
+    current_move.gen_turn_command(100, -np.pi/2, -STEPS_PER_SECOND)
+    
+    current_move.gen_file(instruction_file)
+
+    robot.trail = []
+
+    robot.read_command_file(instruction_file)
+
+    if ser and ser.is_open:
         comm.move_robot(ser, current_move)
 
     update_view()
@@ -106,7 +126,7 @@ def on_stg_button_clicked(event):
 
 def on_image_button_clicked(event):
 
-    if not ser.is_open:
+    if not ser or not ser.is_open:
         return
 
     print('Acquiring image')
@@ -134,12 +154,6 @@ def on_radio_button_clicked(label):
         use_shortest_path = True
     if label == LABEL_DIRECT:
         use_shortest_path = False
-
-
-def on_port_edited(text):
-    global ser
-    print(type(text))
-    ser = comm.open_port(text)
 
 
 def on_mouse_button_press(event):
@@ -205,9 +219,6 @@ if len(sys.argv) >= 2:
 else:
     print('Running without serial port')
 
-# FIXME
-ser = comm.open_port('COM15')
-
 width_mm = 999
 height_mm = 999
 cell_size_mm = 20
@@ -218,7 +229,9 @@ line_thickness = 1
 
 WALKABLE_MIN_RADIUS = EPuck2.EPuck2.RADIUS_MM * 2
 
-STEPS_PER_SECOND = 300
+STEPS_PER_SECOND = 400
+
+instruction_file = 'instructions.txt'
 
 robot = EPuck2.EPuck2(x_mm=width_mm / 2, y_mm=height_mm / 2, angle_rad=0)
 current_move = move.Move(robot.x_mm, robot.y_mm)
@@ -238,7 +251,7 @@ button_hovercolor = '0.95'
 
 BUTTON_Y = 0.025
 BUTTON_HEIGHT = 0.04
-NUM_BUTTONS = 10
+NUM_BUTTONS = 9
 BUTTON_MARGIN = 0.01
 BUTTON_SPACING = (1 - BUTTON_MARGIN) / NUM_BUTTONS
 BUTTON_WIDTH = BUTTON_SPACING - BUTTON_MARGIN
@@ -246,12 +259,14 @@ BUTTON_WIDTH = BUTTON_SPACING - BUTTON_MARGIN
 send_instruction_button_ax = plt.axes(
     [BUTTON_MARGIN + 0 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 set_button_ax = plt.axes(
-    [BUTTON_MARGIN + 2 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+    [BUTTON_MARGIN + 1 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 get_button_ax = plt.axes(
-    [BUTTON_MARGIN + 3 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+    [BUTTON_MARGIN + 2 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 bezier_button_ax = plt.axes(
-    [BUTTON_MARGIN + 4 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+    [BUTTON_MARGIN + 3 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 stg_button_ax = plt.axes(
+    [BUTTON_MARGIN + 4 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+smooth_turn_button_ax = plt.axes(
     [BUTTON_MARGIN + 5 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 scan_button_ax = plt.axes(
     [BUTTON_MARGIN + 6 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
@@ -259,10 +274,6 @@ image_button_ax = plt.axes(
     [BUTTON_MARGIN + 7 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 radio_button_ax = plt.axes(
     [BUTTON_MARGIN + 8 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, 3 * BUTTON_HEIGHT])
-
-#port_text_ax = plt.axes([BUTTON_MARGIN + 9 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, 3 * BUTTON_HEIGHT])
-#port_text_box = TextBox(port_text_ax, 'Port')
-# port_text_box.on_submit(on_port_edited)
 
 set_button = Button(set_button_ax, 'Set',
                     color=button_color, hovercolor=button_hovercolor)
@@ -273,6 +284,8 @@ send_instruction_button = Button(
 bezier_button = Button(bezier_button_ax, 'Bezier',
                        color=button_color, hovercolor=button_hovercolor)
 stg_button = Button(stg_button_ax, 'STG',
+                    color=button_color, hovercolor=button_hovercolor)
+smooth_turn_button = Button(smooth_turn_button_ax, 'Smooth',
                     color=button_color, hovercolor=button_hovercolor)
 image_button = Button(image_button_ax, 'Photo',
                       color=button_color, hovercolor=button_hovercolor)
@@ -289,6 +302,7 @@ get_button.on_clicked(on_get_button_clicked)
 send_instruction_button.on_clicked(on_send_instruction_button_clicked)
 bezier_button.on_clicked(on_bezier_button_clicked)
 stg_button.on_clicked(on_stg_button_clicked)
+smooth_turn_button.on_clicked(on_smooth_turn_button_clicked)
 scan_button.on_clicked(on_scan_button_clicked)
 image_button.on_clicked(on_image_button_clicked)
 radio_button.on_clicked(on_radio_button_clicked)
@@ -300,10 +314,9 @@ fig.canvas.mpl_connect('button_press_event', on_mouse_button_press)
 
 update_view()
 
-# FIXME: is_open test obviously does not work on a None object
-if ser.is_open:
+if ser and ser.is_open:
     comm.clean_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
-    #comm.beep(ser, 440)
+    comm.beep(ser, 440)
 
 # Start the matplotlib main
 plt.show()
