@@ -104,11 +104,7 @@ def on_stg_button_clicked(event):
 def on_smooth_turn_button_clicked(event):
     print('Generating smooth turn command')
 
-    #current_move.gen_smooth_turn_command(STEPS_PER_SECOND, robot.angle_rad)
-    current_move.gen_turn_command(100, np.pi/2, STEPS_PER_SECOND)
-    current_move.gen_turn_command(100, -np.pi/2, STEPS_PER_SECOND)
-    current_move.gen_turn_command(100, np.pi/2, -STEPS_PER_SECOND)
-    current_move.gen_turn_command(100, -np.pi/2, -STEPS_PER_SECOND)
+    current_move.gen_smooth_turn_command(STEPS_PER_SECOND, robot.angle_rad)
     
     current_move.gen_file(instruction_file)
 

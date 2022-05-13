@@ -90,26 +90,26 @@ class Move:
             (steps_per_second_left, steps_per_second_right, duration_ms))
 
     def gen_turn_command(self, radius_mm, angle_rad, steps_per_second):
-        # NOTE: A positive radius means the turn is to the right
-        
-        distance_center_mm = radius_mm * angle_rad
-        
-        if radius_mm >= 0:
-            distance_left_mm = (radius_mm + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
-            distance_right_mm = (radius_mm - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
-        else:
-            distance_left_mm = (radius_mm - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
-            distance_right_mm = (radius_mm + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
 
+        if radius_mm == 0:
+            self.gen_in_place_turn_command(angle_rad, steps_per_second)
+            return
+
+        distance_center_mm = radius_mm * angle_rad
+        distance_left_mm = (
+            radius_mm - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
+        distance_right_mm = (
+            radius_mm + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle_rad
         distance_center_steps = distance_center_mm / EPuck2.EPuck2.MM_PER_STEP
         distance_left_steps = distance_left_mm / EPuck2.EPuck2.MM_PER_STEP
         distance_right_steps = distance_right_mm / EPuck2.EPuck2.MM_PER_STEP
-        duration_s = abs(distance_center_steps / steps_per_second)
-        steps_per_second_left = int(distance_left_steps / duration_s)
-        steps_per_second_right = int(distance_right_steps / duration_s)
-        duration_ms = int(duration_s * 1000)
-        self.command.append((steps_per_second_left, steps_per_second_right, duration_ms))
-
+        steps_per_second_left = int(
+            distance_left_steps / abs(distance_center_steps) * steps_per_second)
+        steps_per_second_right = int(
+            distance_right_steps / abs(distance_center_steps) * steps_per_second)
+        duration_ms = int(abs(distance_center_steps / steps_per_second * 1000))
+        self.command.append(
+            (steps_per_second_left, steps_per_second_right, duration_ms))
 
     def gen_stg_command(self, steps_per_second, current_robot_angle_rad):
 
