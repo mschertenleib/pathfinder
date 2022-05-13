@@ -98,7 +98,7 @@ short pgdc(short a,short b){
 float compute_phi(short l, short r){
 
 	short diff = l - r;
-	return atan2f((float)diff*CMPSTEP,RBTWIDTHCM);
+	return -atan2f((float)diff*CMPSTEP,RBTWIDTHCM);
 
 	/*
 	short op = 0;

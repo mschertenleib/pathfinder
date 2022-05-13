@@ -1,7 +1,7 @@
 #ifndef ODOM_H
 #define ODOM_H
 
-#define TIMERES 100 //time between mesures
+#define TIMERES 20 //time between mesures
 #define CMPSTEP (13.0f/1000.0f) //cm per step
 #define RBTWIDTHS 423//robot width in STEPS
 #define RBTWIDTHCM 5.389f //robot width in cm

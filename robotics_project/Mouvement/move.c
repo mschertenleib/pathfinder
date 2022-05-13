@@ -13,7 +13,7 @@
 #include <move.h>
 
 int16_t move_sequence[3*MAX_MOVES] = {'\0'};
-uint8_t size_move = 0;
+uint16_t size_move = 0;
 bool STOP = FALSE;
 uint8_t current_move = 0;
 bool running_sequence = FALSE;
@@ -37,14 +37,8 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 
 	if(!running_sequence){
 		set_body_led(0);
-		l1 = chSequentialStreamGet(in);
-		l2 = chSequentialStreamGet(in);
 
-		// The first 2 bytes is the length of the datas
-		// -> number of int16_t data
-		size_move = (int16_t)((l2 | l1<<8));
-		size_move = size_move/3;
-		chprintf(out,"Length : %x \r\n",size_move);
+		size_move = ReceiveUint16FromComputer(out);
 
 		while(1){
 
@@ -53,18 +47,15 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 			r1 = chSequentialStreamGet(in); //get first byte of rightspeed
 			if(l1 == 'E' && l2 == 'N' && r1 == 'D'){
 				i++;
-				chprintf(out,"STOP Detected after %d moves\r\n",i-1);
 				break;
 			}
 			r2 = chSequentialStreamGet(in); //get second byte of rightspeed
 			t1 = chSequentialStreamGet(in); //get first byte of runtime
 			t2 = chSequentialStreamGet(in); //get second byte of runtime
 
-			chprintf(out,"loading %d L %d R %d T%d \r\n",i,(int16_t)((l2 | l1<<8)),(int16_t)((r2 | r1<<8)),(int16_t)((t2 | t1<<8)));
-
-			move_sequence[i*3] = (int16_t)((l2 | l1<<8));        // left speed
-			move_sequence[(i*3)+1] = (int16_t)((r2 | r1<<8));    // right speed
-			move_sequence[(i*3)+2] = (int16_t)((t2 | t1<<8));    // runtime
+			move_sequence[i*3] = (int16_t)((l1 | l2<<8));        // left speed
+			move_sequence[(i*3)+1] = (int16_t)((r1 | r2<<8));    // right speed
+			move_sequence[(i*3)+2] = (int16_t)((t1 | t2<<8));    // runtime
 
 			i++;
 			if(i > MAX_MOVES-2) {
@@ -103,6 +94,7 @@ static THD_FUNCTION(moveThread,arg){
 			rspd = move_sequence[(i*3)+1];
 			stime = move_sequence[(i*3)+2];
 			if(STOP) break;
+			if(stime == 0) continue;
 			left_motor_set_speed(lspd);
 			right_motor_set_speed(rspd);
 			//chprintf((BaseSequentialStream *) &SD3,"running %d L %d R %d for %d ms \r\n",i,lspd,rspd,stime);
@@ -156,7 +148,7 @@ void scan(BaseSequentialStream* out){
 		SendUint16ToComputer(out,dist);
 		chThdSleepMilliseconds(TIMERES);
 	}
-	chprintf(out,"END");
+	SendUint16ToComputer(out,0xffff);
 }
 
 void lauch_move_thd(void){
