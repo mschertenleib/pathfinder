@@ -12,11 +12,12 @@
 
 #include <move.h>
 
+uint8_t current_move = 0;
 int16_t move_sequence[3*MAX_MOVES] = {'\0'};
 uint16_t size_move = 0;
 bool STOP = FALSE;
-uint8_t current_move = 0;
 bool running_sequence = FALSE;
+bool scanning = FALSE;
 
 // semaphore if sequence has been uploaded
 static BSEMAPHORE_DECL(sequence_ready_sem, TRUE);
@@ -35,7 +36,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 	volatile uint16_t i=0;
 	STOP = FALSE;
 
-	if(!running_sequence){
+	if(!running_sequence && !scanning){
 		set_body_led(0);
 
 		size_move = ReceiveUint16FromComputer(out);
@@ -125,30 +126,33 @@ void sequence_override(void){
 }
 
 void scan(BaseSequentialStream* out){
-	set_body_led(0);
-	float ang;
-	uint16_t dist;
-	int turnspd = (int)(M_PI*RBTWIDTHCM*1000)/(13.0f*secscan);
-	size_move = 1;
-	move_sequence[0] = turnspd;
-	move_sequence[1] = -turnspd;
-	move_sequence[2] = secscan*1100;
-	STOP = FALSE;
-	chBSemSignal(&sequence_ready_sem);
-	SendFloatToComputer(out,get_posx());
-	SendFloatToComputer(out,get_posy());
-	SendFloatToComputer(out,get_angle());
-	while(!running_sequence){
-		chThdSleepMilliseconds(100);
+	if(!running_sequence && !scanning){
+		set_body_led(0);
+		float start_ang = get_angle();
+		float ang = start_ang;
+		uint16_t dist;
+		int turnspd = (int)(M_PI*RBTWIDTHCM*1000)/(13.0f*secscan);
+		size_move = 1;
+		move_sequence[0] = turnspd;
+		move_sequence[1] = -turnspd;
+		move_sequence[2] = secscan*1100;
+		STOP = FALSE;
+		chBSemSignal(&sequence_ready_sem);
+		SendFloatToComputer(out,get_posx());
+		SendFloatToComputer(out,get_posy());
+		SendFloatToComputer(out,get_angle());
+		while(!running_sequence  || (ang == start_ang)){
+			chThdSleepMilliseconds(100);
+		}
+		while(running_sequence){
+			ang = get_angle();
+			dist = VL53L0X_get_dist_mm();
+			SendFloatToComputer(out,ang);
+			SendUint16ToComputer(out,dist);
+			chThdSleepMilliseconds(TIMERES);
+		}
+		SendUint16ToComputer(out,0xffff);
 	}
-	while(running_sequence){
-		ang = get_angle();
-		dist = VL53L0X_get_dist_mm();
-		SendFloatToComputer(out,ang);
-		SendUint16ToComputer(out,dist);
-		chThdSleepMilliseconds(TIMERES);
-	}
-	SendUint16ToComputer(out,0xffff);
 }
 
 void lauch_move_thd(void){
