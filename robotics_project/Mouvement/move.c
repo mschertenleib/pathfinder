@@ -1,3 +1,11 @@
+/*
+EPFL MICRO-301 GR59
+Gilles Regamey (296642) - Mathieu Schertenleib (313318)
+may 2022
+*/
+
+#include "move.h"
+
 #include "ch.h"
 #include "hal.h"
 #include "leds.h"
@@ -6,19 +14,17 @@
 #include <math.h>
 #include <chprintf.h>
 #include <sensors/VL53L0X/VL53L0X.h>
-#include <communications.h>
-#include <odometrie.h>
-#include <main.h>
 
-#include <move.h>
+#include "communications.h"
+#include "odometrie.h"
+#include "main.h"
 
-int16_t move_sequence[3*MAX_MOVES] = {'\0'};
-uint16_t size_move = 0;
-bool STOP = FALSE;
-uint8_t current_move = 0;
-bool running_sequence = FALSE;
+int16_t move_sequence[3*MAX_MOVES] = {'\0'}; //move instruction buffer
+uint16_t size_move = 0;						 //# of instructions
+bool STOP = FALSE;							 //hard stop
+bool running_sequence = FALSE;				 //is it moving ?
 
-// semaphore if sequence has been uploaded
+// semaphore if a sequence is ready
 static BSEMAPHORE_DECL(sequence_ready_sem, TRUE);
 
 /*
@@ -68,12 +74,13 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 		chBSemSignal(&sequence_ready_sem);
 
 	}else{
-		chprintf(out,"cannot load sequence, a sequence being used %d \r\n",chSequentialStreamGet(in));
+		chprintf(out,"cannot load sequence, already running moves\r\n");
 	}
-	set_body_led(0);
 }
 
-
+/*
+*	Thread to process moves
+*/
 static THD_WORKING_AREA(moveThreadArea,1024);
 static THD_FUNCTION(moveThread,arg){
 
@@ -82,14 +89,14 @@ static THD_FUNCTION(moveThread,arg){
 
 	while(TRUE){
 		chBSemWait(&sequence_ready_sem);
-		chThdSleepMilliseconds(500);
+		//chThdSleepMilliseconds(500);	?????
 		running_sequence = TRUE;
-		current_move = 0;
 		int16_t lspd = 0;
 		int16_t rspd = 0;
 		int16_t stime = 0;
+
+		//Move loop.
 		for(uint8_t i = 0; i < (size_move); i++){
-			current_move = i;
 			lspd = move_sequence[i*3];
 			rspd = move_sequence[(i*3)+1];
 			stime = move_sequence[(i*3)+2];
@@ -97,63 +104,68 @@ static THD_FUNCTION(moveThread,arg){
 			if(stime == 0) continue;
 			left_motor_set_speed(lspd);
 			right_motor_set_speed(rspd);
-			//chprintf((BaseSequentialStream *) &SD3,"running %d L %d R %d for %d ms \r\n",i,lspd,rspd,stime);
 			chThdSleepMilliseconds(stime);
 		}
+		//stopping after end of sequence.
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
-		if(!STOP) current_move = 0;
-		//chprintf((BaseSequentialStream *) &SD3,"DONE\r\n");
 		chThdSleepMilliseconds(100);
 		running_sequence = FALSE;
-		set_body_led(1);
 		chBSemReset(&sequence_ready_sem,TRUE);
 	}
 }
 
-void stop(){
+//command stop.
+void stop(void){
 	sequence_override();
 	left_motor_set_speed(0);
 	right_motor_set_speed(0);
-	STOP = TRUE;
 }
 
+//to override the sequence without stopping.
 void sequence_override(void){
 	STOP = TRUE;
 	running_sequence = FALSE;
 }
 
+//command to do a "lidar turn".
 void scan(BaseSequentialStream* out){
+	stop();
 	set_body_led(0);
 	uint16_t dist = 0;
 	float Bang = get_angle();
 	float ang = Bang;
+	//one move sequence setup.
 	size_move = 1;
-	move_sequence[0] = 118;
-	move_sequence[1] = -118;
-	move_sequence[2] = 11100;
+	move_sequence[0] = 118;		//| 
+	move_sequence[1] = -118;	//| Optimized for a clean turn and measure.
+	move_sequence[2] = 11100;	//|
 	STOP = FALSE;
 	chBSemSignal(&sequence_ready_sem);
+	//communicates position and direction to computer.
 	SendFloatToComputer(out,get_posx());
 	SendFloatToComputer(out,get_posy());
 	SendFloatToComputer(out,get_angle());
+	//waits for sequence to begin.
 	while(!running_sequence || ang == Bang){
 		chThdSleepMilliseconds(200);
 		ang = get_angle();
 	}
-	while(running_sequence && ang != Bang){
+	//measuring loop
+	while(running_sequence){
 		ang = get_angle();
 		dist = VL53L0X_get_dist_mm();
 		SendFloatToComputer(out,ang);
 		SendUint16ToComputer(out,dist);
 		chThdSleepMilliseconds(TIMERES);
 	}
-	if(running_sequence) stop();
+	//end condition for computer, unreachable naturally.
 	SendUint16ToComputer(out,0xffff);
 	SendUint16ToComputer(out,0xffff);
 	SendUint16ToComputer(out,0xffff);
 }
 
+// create move thread.
 void lauch_move_thd(void){
 	chThdCreateStatic(moveThreadArea,
 							  sizeof(moveThreadArea),
