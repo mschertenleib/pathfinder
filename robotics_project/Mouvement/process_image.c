@@ -3,7 +3,7 @@
 #include <chprintf.h>
 #include <usbcfg.h>
 #include <camera/po8030.h>
-#include<communications.h>
+#include <communications.h>
 #include <string.h>
 
 #include "main.h"
@@ -18,13 +18,14 @@ static THD_FUNCTION(CaptureImage, arg) {
 	chRegSetThreadName(__FUNCTION__);
 	(void) arg;
 
+	// Configure the camera with an RGB565 format, using the parameters defined in process_image.h
 	po8030_advanced_config(FORMAT_RGB565, IMAGE_X, IMAGE_Y, IMAGE_WIDTH,
 			IMAGE_HEIGHT, IMAGE_SUBSAMPLING, IMAGE_SUBSAMPLING);
-	//dcmi_enable_double_buffering();
 	dcmi_set_capture_mode(CAPTURE_ONE_SHOT);
 	dcmi_prepare();
 
 	while (1) {
+		// Wait for an image to be requested
 		chBSemWait(&picture);
 		// Start a capture
 		dcmi_capture_start();
@@ -43,8 +44,6 @@ static THD_FUNCTION(ProcessImage, arg) {
 
 	uint8_t *img_buff_ptr = NULL;
 
-	uint8_t current_loop = 0;
-
 	while (1) {
 
 		// Wait until an image has been captured
@@ -53,12 +52,12 @@ static THD_FUNCTION(ProcessImage, arg) {
 		// Get the pointer to the array filled with the last image in RGB565
 		img_buff_ptr = dcmi_get_last_image_ptr();
 
-		// Send width and height (subsampling taken into account)
-		SendUint16ToComputer((BaseSequentialStream * )&SD3,IMAGE_WIDTH/SUBSAMPLING_VALUE);
-		SendUint16ToComputer((BaseSequentialStream * )&SD3,IMAGE_HEIGHT/SUBSAMPLING_VALUE);
+		// Send width and height (subsampling taken into account) to the PC
+		SendUint16ToComputer((BaseSequentialStream *)&SD3, IMAGE_WIDTH / SUBSAMPLING_VALUE);
+		SendUint16ToComputer((BaseSequentialStream *)&SD3, IMAGE_HEIGHT / SUBSAMPLING_VALUE);
 
-		// Send the binary data to the PC
-		chSequentialStreamWrite((BaseSequentialStream * )&SD3, (uint8_t* )img_buff_ptr,IMAGE_BUFFER_SIZE);
+		// Send the binary pixel data to the PC
+		chSequentialStreamWrite((BaseSequentialStream *)&SD3, (uint8_t *)img_buff_ptr, IMAGE_BUFFER_SIZE);
 	}
 }
 
@@ -69,6 +68,7 @@ void process_image_start(void) {
 			CaptureImage, NULL);
 }
 
-void get_picture(void){
+void get_picture(void) {
+	// Request an image to be captured
 	chBSemSignal(&picture);
 }
