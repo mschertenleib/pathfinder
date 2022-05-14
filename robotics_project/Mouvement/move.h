@@ -2,12 +2,12 @@
 #define MOVE_H
 
 #define MAX_MOVES 100
-#define secscan 19
+#define secscan 6
 // External functions
 
 void ReceiveSpeedInstMove(BaseSequentialStream* in,BaseSequentialStream* out);
 
-void stop(BaseSequentialStream* out);
+void stop();
 
 void sequence_override(void);
 

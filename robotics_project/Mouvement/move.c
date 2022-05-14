@@ -111,12 +111,11 @@ static THD_FUNCTION(moveThread,arg){
 	}
 }
 
-void stop(BaseSequentialStream* out){
+void stop(){
 	sequence_override();
 	left_motor_set_speed(0);
 	right_motor_set_speed(0);
 	STOP = TRUE;
-	//chprintf(out,"stopped.\r\n");
 }
 
 void sequence_override(void){
@@ -132,14 +131,14 @@ void scan(BaseSequentialStream* out){
 	size_move = 1;
 	move_sequence[0] = turnspd;
 	move_sequence[1] = -turnspd;
-	move_sequence[2] = secscan*1100;
+	move_sequence[2] = secscan*1050;
 	STOP = FALSE;
 	chBSemSignal(&sequence_ready_sem);
 	SendFloatToComputer(out,get_posx());
 	SendFloatToComputer(out,get_posy());
 	SendFloatToComputer(out,get_angle());
 	while(!running_sequence){
-		chThdSleepMilliseconds(100);
+		chThdSleepMilliseconds(300);
 	}
 	while(running_sequence){
 		ang = get_angle();
