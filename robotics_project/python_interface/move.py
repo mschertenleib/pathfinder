@@ -1,13 +1,15 @@
+import EPuck2
+
+
 import sys
 import numpy as np
 
-import EPuck2
 
 def recursive_bezier(points, t):
     """
     Used to generate a Bezier curve recursively
     """
-    
+
     if len(points) != 1:
         new_points = []
         for i in range(len(points) - 1):
@@ -23,7 +25,7 @@ def angle_vecs(v1, v2):
     """
     Get the angle formed by two vectors
     """
-    
+
     norm_v1 = norm(v1)
     norm_v2 = norm(v2)
     if norm_v1 == 0 or norm_v2 == 0:
@@ -39,7 +41,7 @@ def angle_points(a0, a1, b0, b1):
     """
     Get the angle formed by two segments a0a1 and b0b1
     """
-    
+
     v1 = np.subtract(a1, a0)
     v2 = np.subtract(b1, b0)
     return angle_vecs(v1, v2)
@@ -49,7 +51,7 @@ def norm(vect):
     """
     Get the norm of a 2D vector
     """
-    
+
     return np.sqrt(vect[0]**2 + vect[1]**2)
 
 
@@ -57,7 +59,7 @@ def dist(a, b):
     """
     Get the distance between two points:
     """
-    
+
     return norm(np.subtract(b, a))
 
 
@@ -65,7 +67,7 @@ def circle_center_from_3_points(p1, p2, p3):
     """
     Get the center of a circle passing through three points
     """
-    
+
     z1 = p1[0] + p1[1] * 1j
     z2 = p2[0] + p2[1] * 1j
     z3 = p3[0] + p3[1] * 1j
@@ -87,14 +89,23 @@ def circle_center_from_3_points(p1, p2, p3):
 class Move:
     """
     Represents a set of moves. Stores control points, from which a set of commands for the robot can be created
+
+    Attributes
+    ---
+    points:
+        Control points for the commands
+    commands:
+        Set of commands (speed_left_steps_per_second, speed_right_steps_per_second, duration_ms)
+    path:
+        Only used for Bezier curves, path of the robot
     """
 
     def __init__(self, x_mm, y_mm):
-        self.data = [(x_mm, y_mm)]
+        self.points = [(x_mm, y_mm)]
+        self.commands = []
         self.path = []
-        self.command = []
 
-    def reset_data(self, x_mm, y_mm):
+    def reset_points(self, x_mm, y_mm):
         """
         Resets the control points and sets the first one to (x_mm, y_mm)
 
@@ -105,8 +116,8 @@ class Move:
         y_mm:
             The y coordinate to start with in millimeters
         """
-        
-        self.data = [(x_mm, y_mm)]
+
+        self.points = [(x_mm, y_mm)]
 
     def draw_path(self, ax, color):
         """
@@ -122,19 +133,19 @@ class Move:
 
         xs_mm = []
         ys_mm = []
-        for x_mm, y_mm in self.data:
+        for x_mm, y_mm in self.points:
             xs_mm.append(x_mm)
             ys_mm.append(y_mm)
         ax.plot(xs_mm, ys_mm, color=color)
-        
+
     def remove_adjacent_duplicate_points(self):
         """
         Removes duplicate control points that are adjacent
         """
-        
-        for i in range(len(self.data) - 1, 0, -1):
-            if self.data[i] == self.data[i - 1]:
-                del self.data[i]
+
+        for i in range(len(self.points) - 1, 0, -1):
+            if self.points[i] == self.points[i - 1]:
+                del self.points[i]
 
     def gen_straight_command(self, distance_mm, steps_per_second):
         """
@@ -153,7 +164,7 @@ class Move:
 
         distance_steps = distance_mm / EPuck2.EPuck2.MM_PER_STEP
         duration_ms = int(distance_steps / steps_per_second * 1000)
-        self.command.append(
+        self.commands.append(
             (int(steps_per_second), int(steps_per_second), duration_ms))
 
     def gen_in_place_turn_command(self, angle_rad, steps_per_second):
@@ -178,7 +189,7 @@ class Move:
             int(steps_per_second) if angle_rad > 0 else int(steps_per_second)
         steps_per_second_right = int(
             steps_per_second) if angle_rad > 0 else -int(steps_per_second)
-        self.command.append(
+        self.commands.append(
             (steps_per_second_left, steps_per_second_right, duration_ms))
 
     def gen_turn_command(self, radius_mm, angle_rad, steps_per_second):
@@ -215,7 +226,7 @@ class Move:
                 steps_per_second / distance_left_mm * distance_right_mm)
             duration_ms = int(
                 abs(distance_left_steps / steps_per_second * 1000))
-            self.command.append(
+            self.commands.append(
                 (steps_per_second_left, steps_per_second_right, duration_ms))
         elif abs(distance_right_steps) > abs(distance_left_steps):
             steps_per_second_right = int(steps_per_second)
@@ -223,7 +234,7 @@ class Move:
                 steps_per_second / distance_right_steps * distance_left_steps)
             duration_ms = int(
                 abs(distance_right_steps / steps_per_second * 1000))
-            self.command.append(
+            self.commands.append(
                 (steps_per_second_left, steps_per_second_right, duration_ms))
 
     def gen_stg_command(self, steps_per_second, current_robot_angle_rad):
@@ -238,26 +249,26 @@ class Move:
             The current angle of the robot in radians
         """
 
-        self.command.clear()
-        
+        self.commands.clear()
+
         self.remove_adjacent_duplicate_points()
 
-        for i in range(len(self.data) - 1):
+        for i in range(len(self.points) - 1):
 
             # Turning phase
             if i == 0:
                 angle_rad = angle_points((0, 0), (np.cos(current_robot_angle_rad), np.sin(
-                    current_robot_angle_rad)), self.data[0], self.data[1])
+                    current_robot_angle_rad)), self.points[0], self.points[1])
             else:
                 angle_rad = angle_points(
-                    self.data[i - 1], self.data[i], self.data[i], self.data[i + 1])
+                    self.points[i - 1], self.points[i], self.points[i], self.points[i + 1])
 
             if abs(angle_rad) > 0:
                 self.gen_in_place_turn_command(angle_rad, steps_per_second)
 
             # Forward phase
             self.gen_straight_command(
-                dist(self.data[i], self.data[i + 1]), steps_per_second)
+                dist(self.points[i], self.points[i + 1]), steps_per_second)
 
     def gen_smooth_turn_command(self, steps_per_second, current_robot_angle_rad):
         """
@@ -270,24 +281,24 @@ class Move:
         current_robot_angle_rad:
             The current angle of the robot in radians
         """
-        
-        self.command.clear()
-        
+
+        self.commands.clear()
+
         self.remove_adjacent_duplicate_points()
 
-        if len(self.data) < 2:
+        if len(self.points) < 2:
             return
 
         # First align with the direction of the first segment
         angle_rad = angle_points((0, 0), (np.cos(current_robot_angle_rad), np.sin(
-            current_robot_angle_rad)), self.data[0], self.data[1])
+            current_robot_angle_rad)), self.points[0], self.points[1])
         self.gen_in_place_turn_command(angle_rad, steps_per_second)
 
         max_tangent_length_mm = 0
 
-        for i in range(1, len(self.data) - 1):  # For each corner
-            vec_segment_1 = np.subtract(self.data[i], self.data[i - 1])
-            vec_segment_2 = np.subtract(self.data[i + 1], self.data[i])
+        for i in range(1, len(self.points) - 1):  # For each corner
+            vec_segment_1 = np.subtract(self.points[i], self.points[i - 1])
+            vec_segment_2 = np.subtract(self.points[i + 1], self.points[i])
             length_segment_1_mm = norm(vec_segment_1)
             length_segment_2_mm = norm(vec_segment_2)
             straight_distance_mm = length_segment_1_mm - max_tangent_length_mm
@@ -295,12 +306,14 @@ class Move:
                 length_segment_1_mm / 2, length_segment_2_mm / 2)
             straight_distance_mm -= max_tangent_length_mm
             angle_rad = angle_vecs(vec_segment_1, vec_segment_2)
-            turn_radius_mm = max_tangent_length_mm / np.tan(angle_rad / 2)
             self.gen_straight_command(straight_distance_mm, steps_per_second)
-            self.gen_turn_command(turn_radius_mm, angle_rad, steps_per_second)
+            if angle_rad != 0:
+                turn_radius_mm = max_tangent_length_mm / np.tan(angle_rad / 2)
+                self.gen_turn_command(
+                    turn_radius_mm, angle_rad, steps_per_second)
 
         # For the last segment, drive to the end of it
-        vec_last_segment = np.subtract(self.data[-1], self.data[-2])
+        vec_last_segment = np.subtract(self.points[-1], self.points[-2])
         length_last_segment_mm = norm(vec_last_segment)
         straight_distance_mm = length_last_segment_mm - max_tangent_length_mm
         self.gen_straight_command(straight_distance_mm, steps_per_second)
@@ -314,14 +327,14 @@ class Move:
         steps:
             The number of discretization steps in the Bezier curve generation
         """
-        
-        steps *= (len(self.data) - 1)
+
+        steps *= (len(self.points) - 1)
         self.path.clear()
         if steps == 0:
             return
         for i in range(steps + 1):
             t = i / steps
-            self.path.append(recursive_bezier(self.data, t))
+            self.path.append(recursive_bezier(self.points, t))
 
     def gen_file(self, filename):
         """
@@ -332,20 +345,20 @@ class Move:
         filename:
             The name of the file to write to
         """
-        
+
         f = open(filename, 'w')
         original_stdout = sys.stdout
         sys.stdout = f  # Change the standard output to the file we created.
         print('!MOVE')
-        nb_commands = len(self.command)
+        nb_commands = len(self.commands)
         print(nb_commands)
 
-        for command in self.command:
+        for command in self.commands:
             cmdline = str(command)[1:len(str(command))-1]
             lspd, rspd, stime = cmdline.split(', ')
             print(lspd, rspd, stime)
 
-        print('END %.2f %.2f' % (self.data[-1][0], self.data[-1][1]))
+        print('END %.2f %.2f' % (self.points[-1][0], self.points[-1][1]))
         sys.stdout = original_stdout  # Reset the standard output to its original value
 
     def gen_bez_command(self, steps_per_second, current_robot_angle_rad):
@@ -360,7 +373,7 @@ class Move:
             The current angle of the robot in radians
         """
 
-        self.command.clear()
+        self.commands.clear()
         self.remove_adjacent_duplicate_points()
 
         if len(self.path) <= 2:
@@ -407,5 +420,5 @@ class Move:
                     Ltrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
                 steps_per_second_right = int(
                     Rtrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
-                self.command.append(
+                self.commands.append(
                     (steps_per_second_left, steps_per_second_right, duration_ms))

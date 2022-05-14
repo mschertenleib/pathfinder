@@ -15,38 +15,40 @@ import matplotlib
 matplotlib.use('TkAgg')
 
 
-def on_set_button_clicked(event):
+def execute_current_move():
     robot.trail = []
-    robot.x_mm, robot.y_mm = current_move.data[-1]
-    robot.angle_rad = 0
-    current_move.reset_data(robot.x_mm, robot.y_mm)
+
+    for speed_left, speed_right, duration in current_move.commands:
+        robot.move_speed(speed_left, speed_right, duration)
 
     if ser and ser.is_open:
-        comm.clean_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
+        comm.move_robot(ser, current_move)
+
+    update_view()
+
+    current_move.reset_points(robot.x_mm, robot.y_mm)
+
+
+###########################  Events  ################################
+
+def on_beep_button_clicked(event):
+    comm.beep(ser, 440)
+
+
+def on_set_button_clicked(event):
+    robot.trail = []
+    robot.x_mm, robot.y_mm = current_move.points[-1]
+    robot.angle_rad = 0
+    current_move.reset_points(robot.x_mm, robot.y_mm)
+
+    if ser and ser.is_open:
+        comm.clear_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
 
     update_view()
 
 
-def on_get_button_clicked(event):
-    if ser and ser.is_open:
-        robot.trail = []
-        robot.x_mm, robot.y_mm, robot.angle_rad = comm.get_robot_pos(ser)
-        print('Position:', robot.x_mm, robot.y_mm, robot.angle_rad)
-        current_move.reset_data(robot.x_mm, robot.y_mm)
-
-        update_view()
-
-
-def on_send_instruction_button_clicked(event):
-    if ser and ser.is_open:
-        comm.send_instruction_file(ser, 'instructions.txt')
-
-
-def test_scan_generator(ser):
-    for i in range(100):
-        angle_rad = i / 100 * 2 * np.pi
-        distance_mm = 250 + 100 * np.sin(4*angle_rad)
-        yield angle_rad, distance_mm
+def on_stop_button_clicked(event):
+    comm.stop_robot(ser)
 
 
 def on_scan_button_clicked(event):
@@ -64,20 +66,6 @@ def on_scan_button_clicked(event):
             constructed_map.construct((robot.x_mm, robot.y_mm), robot.angle_rad, EPuck2.EPuck2.RADIUS_MM,
                                       distance_mm, EPuck2.EPuck2.TOF_SENSOR_OFFSET_MM, EPuck2.EPuck2.TOF_MAX_DISTANCE_MM, line_thickness)
             update_view()
-
-
-def execute_current_move():
-    robot.trail = []
-
-    for speed_left, speed_right, duration in current_move.command:
-        robot.move_speed(speed_left, speed_right, duration)
-
-    if ser and ser.is_open:
-        comm.move_robot(ser, current_move)
-
-    update_view()
-
-    current_move.reset_data(robot.x_mm, robot.y_mm)
 
 
 def on_stg_button_clicked(event):
@@ -98,7 +86,6 @@ def on_bezier_button_clicked(event):
 
 
 def on_image_button_clicked(event):
-
     if not ser or not ser.is_open:
         return
 
@@ -109,7 +96,8 @@ def on_image_button_clicked(event):
     print((image_width, image_height, image_buffer))
     image = np.reshape(image_buffer, (image_height, image_width, 3))
 
-    image_ax = fig.add_subplot(1, 2, 2)
+    if not image_ax:
+        image_ax = fig.add_subplot(1, 2, 2)
     image_ax.clear()
     image_ax.set_title('Photo')
     image_ax.get_xaxis().set_visible(False)
@@ -133,17 +121,19 @@ def on_mouse_button_press(event):
         if event.button is MouseButton.LEFT:
             goal_mm = (event.xdata, event.ydata)
             if use_shortest_path:
-                start_mm = current_move.data[-1]
+                start_mm = current_move.points[-1]
                 path = constructed_map.find_path(
                     start_mm, goal_mm, WALKABLE_MIN_RADIUS)
                 if len(path) >= 2:
                     for point_mm in path:
-                        current_move.data.append(point_mm)
+                        current_move.points.append(point_mm)
             else:
-                current_move.data.append(goal_mm)
+                current_move.points.append(goal_mm)
 
             update_view()
 
+
+#########################  Interface  ###############################
 
 def update_view():
     map_image = constructed_map.as_image_with_walkable(
@@ -164,24 +154,26 @@ def update_view():
 
     # Draw move
     current_move.draw_path(map_ax, '#0000ff')
-    
+
     # Draw goal
     points_per_circle = 100
     angles_rad = np.linspace(0, 2 * np.pi, points_per_circle)
-    goal_mm = current_move.data[len(current_move.data) - 1]
+    goal_mm = current_move.points[len(current_move.points) - 1]
     pxs_mm = goal_mm[0] + cell_size_mm / 2 * np.cos(angles_rad)
     pys_mm = goal_mm[1] + cell_size_mm / 2 * np.sin(angles_rad)
     map_ax.plot(pxs_mm, pys_mm, color='#ff0000')
-    
+
     # Draw robot trail
     robot.draw_trail(map_ax, color='#00ffff')
-    
+
     # Draw robot
     robot.draw(map_ax, color='#00ff00')
 
     fig.canvas.draw()
     fig.canvas.flush_events()
 
+
+##########################   main   #################################
 
 ser = serial.Serial()
 if len(sys.argv) >= 2:
@@ -210,7 +202,6 @@ constructed_map = envmap.Environment_map(
 # Create figures and subplots
 fig = plt.figure()
 map_ax = fig.add_subplot(1, 2, 1)
-#image_ax = fig.add_subplot(1, 2, 2)
 plt.subplots_adjust(bottom=0.2)
 
 # Create buttons
@@ -224,54 +215,53 @@ BUTTON_MARGIN = 0.01
 BUTTON_SPACING = (1 - BUTTON_MARGIN) / NUM_BUTTONS
 BUTTON_WIDTH = BUTTON_SPACING - BUTTON_MARGIN
 
-send_instruction_button_ax = plt.axes(
+beep_button_ax = plt.axes(
     [BUTTON_MARGIN + 0 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 set_button_ax = plt.axes(
     [BUTTON_MARGIN + 1 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-get_button_ax = plt.axes(
+stop_button_ax = plt.axes(
     [BUTTON_MARGIN + 2 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-bezier_button_ax = plt.axes(
+scan_button_ax = plt.axes(
     [BUTTON_MARGIN + 3 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 stg_button_ax = plt.axes(
     [BUTTON_MARGIN + 4 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 smooth_turn_button_ax = plt.axes(
     [BUTTON_MARGIN + 5 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-scan_button_ax = plt.axes(
+bezier_button_ax = plt.axes(
     [BUTTON_MARGIN + 6 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 image_button_ax = plt.axes(
     [BUTTON_MARGIN + 7 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 radio_button_ax = plt.axes(
     [BUTTON_MARGIN + 8 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, 3 * BUTTON_HEIGHT])
 
-set_button = Button(set_button_ax, 'Set',
-                    color=button_color, hovercolor=button_hovercolor)
-get_button = Button(get_button_ax, 'Get',
-                    color=button_color, hovercolor=button_hovercolor)
-send_instruction_button = Button(
-    send_instruction_button_ax, 'Send', color=button_color, hovercolor=button_hovercolor)
-bezier_button = Button(bezier_button_ax, 'Bezier',
-                       color=button_color, hovercolor=button_hovercolor)
-stg_button = Button(stg_button_ax, 'STG',
-                    color=button_color, hovercolor=button_hovercolor)
-smooth_turn_button = Button(smooth_turn_button_ax, 'Smooth',
-                            color=button_color, hovercolor=button_hovercolor)
-image_button = Button(image_button_ax, 'Photo',
-                      color=button_color, hovercolor=button_hovercolor)
+beep_button = Button(beep_button_ax, 'Beep',
+                     color=button_color, hovercolor=button_hovercolor)
+set_button = Button(set_button_ax, 'Set', color=button_color,
+                    hovercolor=button_hovercolor)
+stop_button = Button(stop_button_ax, 'Stop',
+                     color=button_color, hovercolor=button_hovercolor)
 scan_button = Button(scan_button_ax, 'Scan',
                      color=button_color, hovercolor=button_hovercolor)
+stg_button = Button(stg_button_ax, 'STG', color=button_color,
+                    hovercolor=button_hovercolor)
+smooth_turn_button = Button(
+    smooth_turn_button_ax, 'Smooth', color=button_color, hovercolor=button_hovercolor)
+bezier_button = Button(bezier_button_ax, 'Bezier',
+                       color=button_color, hovercolor=button_hovercolor)
+image_button = Button(image_button_ax, 'Image',
+                      color=button_color, hovercolor=button_hovercolor)
 
 LABEL_DIRECT = 'Direct'
 LABEL_SHORTEST = 'Shortest'
-radio_button = RadioButtons(
-    radio_button_ax, (LABEL_DIRECT, LABEL_SHORTEST))
+radio_button = RadioButtons(radio_button_ax, (LABEL_DIRECT, LABEL_SHORTEST))
 
+beep_button.on_clicked(on_beep_button_clicked)
 set_button.on_clicked(on_set_button_clicked)
-get_button.on_clicked(on_get_button_clicked)
-send_instruction_button.on_clicked(on_send_instruction_button_clicked)
-bezier_button.on_clicked(on_bezier_button_clicked)
+stop_button.on_clicked(on_stop_button_clicked)
+scan_button.on_clicked(on_scan_button_clicked)
 stg_button.on_clicked(on_stg_button_clicked)
 smooth_turn_button.on_clicked(on_smooth_turn_button_clicked)
-scan_button.on_clicked(on_scan_button_clicked)
+bezier_button.on_clicked(on_bezier_button_clicked)
 image_button.on_clicked(on_image_button_clicked)
 radio_button.on_clicked(on_radio_button_clicked)
 
@@ -283,8 +273,8 @@ fig.canvas.mpl_connect('button_press_event', on_mouse_button_press)
 update_view()
 
 if ser and ser.is_open:
-    comm.clean_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
-    #comm.beep(ser, 440)
+    comm.clear_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
+    comm.beep(ser, 440)
 
 # Start the matplotlib main
 plt.show()

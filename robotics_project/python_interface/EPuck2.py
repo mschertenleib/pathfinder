@@ -1,10 +1,20 @@
-import matplotlib.pyplot as plt
 import numpy as np
 
 
 class EPuck2:
     """
     Class representing the e-puck2 robot, its physical dimensions, and offering a set of methods used to simulate the robot
+    
+    Attributes
+    ---
+    x_mm:
+        X position in millimeters
+    y_mm:
+        Y position in millimeters
+    angle_rad:
+        Angle in radians
+    trail:
+        Series of (x_mm, y_mm, angle_rad) representing the path of the robot
     """
 
     DIAMETER_MM = 73.8
@@ -26,12 +36,16 @@ class EPuck2:
         self.trail = [(self.x_mm, self.y_mm, self.angle_rad)]
 
     def is_speed_valid(self, steps_per_second):
+        """
+        Verify that the given speed is within the robot speed range
+        """
+
         return abs(steps_per_second) <= self.MAX_STEPS_PER_SECOND
 
     def draw(self, ax, color):
         """
         Draws the robot
-        
+
         Parameter
         ---
         ax:
@@ -81,14 +95,8 @@ class EPuck2:
         front_x_mm = self.x_mm + self.RADIUS_MM * cos_angle
         front_y_mm = self.y_mm + self.RADIUS_MM * sin_angle
 
-        # Draw direction
-        #ax.plot([self.x_mm, front_x_mm], [self.y_mm, front_y_mm], color=color)
-
         cone_end_x = front_x_mm + self.RADIUS_MM * cos_angle
         cone_end_y = front_y_mm + self.RADIUS_MM * sin_angle
-
-        # Draw central line
-        #ax.plot([front_x_mm, cone_end_x], [front_y_mm, cone_end_y], color=color)
 
         # Draw left camera line
         ax.plot([front_x_mm, cone_end_x - (self.RADIUS_MM * np.tan(self.CAM_FOV_RAD / 2)) * sin_angle],
@@ -105,7 +113,7 @@ class EPuck2:
     def draw_trail(self, ax, color):
         """
         Draws the trail of the robot, i.e. the path it followed
-        
+
         Parameter
         ---
         ax:
@@ -113,7 +121,7 @@ class EPuck2:
         color:
             The color to use when drawing
         """
-        
+
         xs_mm = []
         ys_mm = []
         for x_mm, y_mm, angle_rad in self.trail:
@@ -124,7 +132,7 @@ class EPuck2:
     def move_steps(self, steps_left, steps_right):
         """
         Moves the simulated robot by the given number of steps
-        
+
         Parameters
         ---
         steps_left:
@@ -169,7 +177,7 @@ class EPuck2:
     def move_speed(self, steps_per_second_left, steps_per_second_right, duration_ms):
         """
         Moves the simulated robot with the given speed during the specified time
-        
+
         Parameters
         ---
         steps_per_second_left:
@@ -179,22 +187,21 @@ class EPuck2:
         duration_ms:
             Duration of the move in milliseconds
         """
-        
+
         steps_left = steps_per_second_left * duration_ms / 1000
         steps_right = steps_per_second_right * duration_ms / 1000
         self.move_steps(steps_left, steps_right)
 
-    
     def read_command_file(self, filename):
         """
         Read the specified file and executes the moves
-        
+
         Parameters
         ---
         filename:
             The name of the instruction file to read
         """
-        
+
         f = open(filename, 'r')
         command = f.readline()
         if command[0:5] == '!MOVE':
@@ -207,19 +214,20 @@ class EPuck2:
 
                 if not self.is_speed_valid(steps_per_second_left) or not self.is_speed_valid(steps_per_second_right):
                     print('Invalid speed (>', self.MAX_STEPS_PER_SECOND, '):',
-                            steps_per_second_left, steps_per_second_right)
+                          steps_per_second_left, steps_per_second_right)
                     return
 
                 print('Moving', steps_per_second_left,
-                        steps_per_second_right, time_ms)
+                      steps_per_second_right, time_ms)
                 self.move_speed(steps_per_second_left,
                                 steps_per_second_right, time_ms)
 
         elif command[0:3] == 'END':
             end_str, supposed_x_str, supposed_y_str = command.split(' ')
-            supposed_x_mm, supposed_y_mm = float(supposed_x_str), float(supposed_y_str)
+            supposed_x_mm, supposed_y_mm = float(
+                supposed_x_str), float(supposed_y_str)
             print('Error X:', self.x_mm - supposed_x_mm,
-                    'mm   Y:', self.y_mm - supposed_y_mm, 'mm')
+                  'mm   Y:', self.y_mm - supposed_y_mm, 'mm')
 
         f.close()
         print(filename, 'Done.')

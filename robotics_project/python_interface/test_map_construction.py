@@ -29,7 +29,7 @@ def main():
         width_mm=width_mm, height_mm=height_mm, cell_size_mm=cell_size_mm)
 
     data_generator = true_map.robot_data_generator(
-        TOF_SENSOR_OFFSET_MM, TOF_MAX_DISTANCE_MM)#, True)
+        TOF_SENSOR_OFFSET_MM, TOF_MAX_DISTANCE_MM, True)
 
     WALKABLE_COLOR = (255, 255, 0)
     ROBOT_COLOR = (0, 255, 0)

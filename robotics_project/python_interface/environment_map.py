@@ -1,20 +1,38 @@
-from configparser import Interpolation
-from cv2 import INTER_NEAREST
 import numpy as np
 import cv2
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
-from pathfinding.finder.dijkstra import DijkstraFinder
-from pyparsing import line_end
 
 
 class Environment_map:
+    """
+    Represents the 2D map of an environment with obstacles. Cell states can be constructed from samples, or set to be free or occupied directly.
+
+    Attributes
+    ---
+    cell_size_mm:
+        The size of a single map cell in millimeters
+    width_mm:
+        The width of the map in millimeters
+    height_mm:
+        The height of the map in millimeters
+    width:
+        The width of the map in cells
+    height:
+        The height of the map in cells
+    free_samples:
+        The number of free samples per cell
+    total_samples:
+        The number of total samples per cell
+    cells:
+        The cells of the map
+    """
 
     __OCCUPIED_THRESHOLD = 0.25
     __FREE_THRESHOLD = 0.75
 
-    def __init__(self, width_mm, height_mm, cell_size_mm):
+    def __init__(self, width_mm, height_mm, cell_size_mm):        
         self.cell_size_mm = cell_size_mm
         self.width_mm = width_mm
         self.height_mm = height_mm
@@ -30,7 +48,7 @@ class Environment_map:
         """
 
         self.cells = np.ones((self.height, self.width))
-        
+
     def set_free(self, x_mm, y_mm):
         """
         Sets a free cell on the map
@@ -44,7 +62,7 @@ class Environment_map:
         """
 
         self.__set_cell(x_mm, y_mm, 1)
-    
+
     def set_occupied(self, x_mm, y_mm):
         """
         Sets an occupied cell on the map
@@ -369,7 +387,8 @@ class Environment_map:
         """
 
         # Free disk where the robot is located
-        self.set_free_filled_circle(center_mm=robot_pos_mm, radius_mm=robot_radius_mm*5/4)
+        self.set_free_filled_circle(
+            center_mm=robot_pos_mm, radius_mm=robot_radius_mm*5/4)
 
         cos_angle = np.cos(robot_angle_rad)
         sin_angle = np.sin(robot_angle_rad)
@@ -389,34 +408,34 @@ class Environment_map:
                 (tof_x_mm, tof_y_mm), (line_end_x_mm, line_end_y_mm), line_thickness)
 
         self.__update_cells()
-    
+
     def as_image(self):
         """
         Get a grayscale image of the map, as a numpy uint8 array
-        
+
         Returns
         ---
         The image
         """
-        
+
         return (self.cells * 255).astype(np.uint8)
 
     def as_image_with_walkable(self, walkable_mm, walkable_color):
         """
         Get a color image of the map with the walkable cells, as a numpy uint8 array
-        
+
         Parameters
         ---
         walkable_mm:
             The minimum distance in millimeters to keep to any obstacle when computing the walkable cells
         walkable_color:
             A uint8 3-tuple representing the color of the walkable cells
-        
+
         Returns
         ---
         The image
         """
-        
+
         map_bgr = cv2.merge([self.as_image()] * 3)
         walkable_mask = cv2.merge([self.__walkable(walkable_mm)] * 3)
         return np.where(walkable_mask > 0, np.array(walkable_color).astype(np.uint8), map_bgr)
@@ -456,7 +475,7 @@ class Environment_map:
             The maximum valid distance in millimeters measured by the TOF
         add_uncertainty:
             Whether to add a simulated gaussian error to each of the returned values
-            
+
         Returns
         ---
         A 4-tuple of robot x position in millimeters, robot y position in millimeters, robot angle in radians, and measured distance in millimeters
@@ -466,7 +485,8 @@ class Environment_map:
         while(True):
 
             robot_angle_rad = i * 1 / 360 * 2 * np.pi
-            robot_x_mm = self.width_mm * (0.4 + 0.2 * np.sin(robot_angle_rad*0.7))
+            robot_x_mm = self.width_mm * \
+                (0.4 + 0.2 * np.sin(robot_angle_rad*0.7))
             robot_y_mm = self.height_mm / 2
 
             start_x_mm = robot_x_mm + \
@@ -486,7 +506,7 @@ class Environment_map:
             yield (robot_x_mm, robot_y_mm, robot_angle_rad, distance_mm)
 
             i += 1
-    
+
     def __set_cell(self, x_mm, y_mm, value):
         """
         Sets the value of a cell on the map
@@ -618,7 +638,7 @@ class Environment_map:
         """
 
         return self.__index_to_val_mm(index_x), self.__index_to_val_mm(index_y)
-    
+
     def __sample_free_line(self, pt1_mm, pt2_mm, thickness=1):
         """
         Updates the samples with a free line from pt1_mm to pt2_mm
@@ -635,15 +655,16 @@ class Environment_map:
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
         pt2_index = self.__point_mm_to_index(pt2_mm)
-        
+
         # Line image as np.uint8 for anti-aliasing to work
         line_to_add = np.zeros((self.height, self.width), dtype=np.uint8)
-        cv2.line(img=line_to_add, pt1=pt1_index, pt2=pt2_index, color=255, thickness=thickness, lineType=cv2.LINE_AA)
+        cv2.line(img=line_to_add, pt1=pt1_index, pt2=pt2_index,
+                 color=255, thickness=thickness, lineType=cv2.LINE_AA)
         line_to_add_float = line_to_add.astype(float) / 255
-        
+
         self.free_samples = cv2.add(self.free_samples, line_to_add_float)
         self.total_samples = cv2.add(self.total_samples, line_to_add_float)
-    
+
     def __sample_free_line_and_obstacle(self, pt1_mm, pt2_mm, thickness=1):
         """
         Updates the samples with an obstacle on pt2_mm and a free line from pt1_mm
@@ -660,12 +681,14 @@ class Environment_map:
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
         pt2_index = self.__point_mm_to_index(pt2_mm)
-        
+
         # Add a full line to total_samples
         line_to_add = np.zeros((self.height, self.width), dtype=np.uint8)
-        cv2.line(img=line_to_add, pt1=pt1_index, pt2=pt2_index, color=255, thickness=thickness, lineType=cv2.LINE_AA)
-        self.total_samples = cv2.add(self.total_samples, line_to_add.astype(float) / 255)
-        
+        cv2.line(img=line_to_add, pt1=pt1_index, pt2=pt2_index,
+                 color=255, thickness=thickness, lineType=cv2.LINE_AA)
+        self.total_samples = cv2.add(
+            self.total_samples, line_to_add.astype(float) / 255)
+
         # Remove the tip of the line before adding to free_samples
         #line_vector = np.subtract(pt2_index, pt1_index)
         #delta = line_vector / np.linalg.norm(line_vector) * thickness
@@ -673,9 +696,10 @@ class Environment_map:
         #line_mask_pt1 = np.add(line_mask_center, (line_vector[1], -line_vector[0]))
         #line_mask_pt2 = np.subtract(line_mask_center, (line_vector[1], -line_vector[0]))
         #cv2.line(img=line_to_add, pt1=line_mask_pt1, pt2=line_mask_pt2, color=0, thickness=thickness)
-        cv2.circle(img=line_to_add, center=pt2_index, radius=thickness, color=0, thickness=-1)
-        self.free_samples = cv2.add(self.free_samples, line_to_add.astype(float) / 255)
-        
+        cv2.circle(img=line_to_add, center=pt2_index,
+                   radius=thickness, color=0, thickness=-1)
+        self.free_samples = cv2.add(
+            self.free_samples, line_to_add.astype(float) / 255)
 
     def __update_cells(self):
         """
@@ -703,15 +727,15 @@ class Environment_map:
         ---
             The grid
         """
-        
+
         # An obstacle is a positive value, a free cell is a 0
         obstacles = np.ones((self.height, self.width), np.uint8)
         obstacles[self.cells > self.__FREE_THRESHOLD] = 0
         cv2.rectangle(obstacles, (0, 0), (self.width - 1, self.height - 1), 1)
-        
+
         kernel = disk_kernel(self.__val_mm_to_index(radius_mm))
         filtered = cv2.filter2D(src=obstacles, ddepth=-1, kernel=kernel)
-        
+
         walkable_grid = 1 - np.clip(filtered, 0, 1)
         return walkable_grid.astype(np.uint8)
 
