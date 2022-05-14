@@ -16,8 +16,8 @@ class EPuck2:
     MM_PER_STEP = WHEEL_CIRCUMFERENCE_MM / STEPS_PER_TURN
     MAX_STEPS_PER_SECOND = 1000
     CAM_FOV_RAD = np.pi / 4
-    TOF_SENSOR_OFFSET_MM = RADIUS_MM - 1.8  # Distance from robot center to TOF sensor
-    TOF_MAX_DISTANCE_MM = 2000
+    TOF_SENSOR_OFFSET_MM = RADIUS_MM - 1.8
+    TOF_MAX_DISTANCE_MM = 1000
 
     def __init__(self, x_mm=0, y_mm=0, angle_rad=0):
         self.x_mm = x_mm
@@ -184,6 +184,7 @@ class EPuck2:
         steps_right = steps_per_second_right * duration_ms / 1000
         self.move_steps(steps_left, steps_right)
 
+    
     def read_command_file(self, filename):
         """
         Read the specified file and executes the moves

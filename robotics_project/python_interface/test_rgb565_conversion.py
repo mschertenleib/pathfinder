@@ -1,5 +1,6 @@
 import communication as comm
 
+
 r, g, b = comm.rgb565_to_rgb888(0b0000_0000_0000_0000)
 print(r, g, b)
 r, g, b = comm.rgb565_to_rgb888(0b1111_1000_0000_0000)

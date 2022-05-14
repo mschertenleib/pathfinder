@@ -16,6 +16,7 @@ matplotlib.use('TkAgg')
 
 
 def on_set_button_clicked(event):
+    robot.trail = []
     robot.x_mm, robot.y_mm = current_move.data[-1]
     robot.angle_rad = 0
     current_move.reset_data(robot.x_mm, robot.y_mm)
@@ -28,8 +29,9 @@ def on_set_button_clicked(event):
 
 def on_get_button_clicked(event):
     if ser and ser.is_open:
+        robot.trail = []
         robot.x_mm, robot.y_mm, robot.angle_rad = comm.get_robot_pos(ser)
-        print('Get pos:', robot.x_mm, robot.y_mm, robot.angle_rad)
+        print('Position:', robot.x_mm, robot.y_mm, robot.angle_rad)
         current_move.reset_data(robot.x_mm, robot.y_mm)
 
         update_view()
@@ -37,7 +39,7 @@ def on_get_button_clicked(event):
 
 def on_send_instruction_button_clicked(event):
     if ser and ser.is_open:
-        comm.send_instruction_file(ser, instruction_file)
+        comm.send_instruction_file(ser, 'instructions.txt')
 
 
 def test_scan_generator(ser):
@@ -65,11 +67,10 @@ def on_scan_button_clicked(event):
 
 
 def execute_current_move():
-    current_move.gen_file(instruction_file)
-
     robot.trail = []
 
-    robot.read_command_file(instruction_file)
+    for speed_left, speed_right, duration in current_move.command:
+        robot.move_speed(speed_left, speed_right, duration)
 
     if ser and ser.is_open:
         comm.move_robot(ser, current_move)
@@ -80,28 +81,19 @@ def execute_current_move():
 
 
 def on_stg_button_clicked(event):
-    print('Generating Stop-Turn-Go command')
-
     current_move.gen_stg_command(STEPS_PER_SECOND, robot.angle_rad)
-
     execute_current_move()
 
 
 def on_smooth_turn_button_clicked(event):
-    print('Generating smooth turn command')
-
     current_move.gen_smooth_turn_command(STEPS_PER_SECOND, robot.angle_rad)
-
     execute_current_move()
 
 
 def on_bezier_button_clicked(event):
-    print('Generating Bezier command')
-
     APPROX_PER_LINE = 3
     current_move.gen_bezier_path(APPROX_PER_LINE)
     current_move.gen_bez_command(STEPS_PER_SECOND, robot.angle_rad)
-
     execute_current_move()
 
 
@@ -110,8 +102,6 @@ def on_image_button_clicked(event):
     if not ser or not ser.is_open:
         return
 
-    print('Acquiring image')
-
     image_data = comm.acquire_image(ser)
     if not image_data:
         return
@@ -119,6 +109,7 @@ def on_image_button_clicked(event):
     print((image_width, image_height, image_buffer))
     image = np.reshape(image_buffer, (image_height, image_width, 3))
 
+    image_ax = fig.add_subplot(1, 2, 2)
     image_ax.clear()
     image_ax.set_title('Photo')
     image_ax.get_xaxis().set_visible(False)
@@ -148,8 +139,6 @@ def on_mouse_button_press(event):
                 if len(path) >= 2:
                     for point_mm in path:
                         current_move.data.append(point_mm)
-                else:
-                    print('Can not find a path to the specified goal')
             else:
                 current_move.data.append(goal_mm)
 
@@ -173,15 +162,9 @@ def update_view():
     # Draw map
     map_ax.imshow(img)
 
-    # Draw robot
-    robot.draw(map_ax, color='#00ff00')
-
-    # Draw robot trail
-    robot.draw_trail(map_ax, color='#00ffff')
-
     # Draw move
     current_move.draw_path(map_ax, '#0000ff')
-
+    
     # Draw goal
     points_per_circle = 100
     angles_rad = np.linspace(0, 2 * np.pi, points_per_circle)
@@ -189,6 +172,12 @@ def update_view():
     pxs_mm = goal_mm[0] + cell_size_mm / 2 * np.cos(angles_rad)
     pys_mm = goal_mm[1] + cell_size_mm / 2 * np.sin(angles_rad)
     map_ax.plot(pxs_mm, pys_mm, color='#ff0000')
+    
+    # Draw robot trail
+    robot.draw_trail(map_ax, color='#00ffff')
+    
+    # Draw robot
+    robot.draw(map_ax, color='#00ff00')
 
     fig.canvas.draw()
     fig.canvas.flush_events()
@@ -212,8 +201,6 @@ WALKABLE_MIN_RADIUS = EPuck2.EPuck2.RADIUS_MM * 2
 
 STEPS_PER_SECOND = 400
 
-instruction_file = 'instructions.txt'
-
 robot = EPuck2.EPuck2(x_mm=width_mm / 2, y_mm=height_mm / 2, angle_rad=0)
 current_move = move.Move(robot.x_mm, robot.y_mm)
 
@@ -223,7 +210,7 @@ constructed_map = envmap.Environment_map(
 # Create figures and subplots
 fig = plt.figure()
 map_ax = fig.add_subplot(1, 2, 1)
-image_ax = fig.add_subplot(1, 2, 2)
+#image_ax = fig.add_subplot(1, 2, 2)
 plt.subplots_adjust(bottom=0.2)
 
 # Create buttons
@@ -297,7 +284,7 @@ update_view()
 
 if ser and ser.is_open:
     comm.clean_and_set(ser, robot.x_mm, robot.y_mm, robot.angle_rad)
-    comm.beep(ser, 440)
+    #comm.beep(ser, 440)
 
 # Start the matplotlib main
 plt.show()
