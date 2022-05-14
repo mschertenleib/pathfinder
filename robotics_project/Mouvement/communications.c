@@ -30,7 +30,7 @@ float ReceiveFloatFromComputer(BaseSequentialStream* in){
 }
 
 uint16_t ReceiveUint16FromComputer(BaseSequentialStream* in){
-	uint16_t f = 0;
-	chSequentialStreamRead(in,(uint8_t*)&f,sizeof(uint16_t));
-	return f;
+	uint16_t i = 0;
+	chSequentialStreamRead(in,(uint8_t*)&i,sizeof(uint16_t));
+	return i;
 }

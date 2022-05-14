@@ -1,9 +1,13 @@
 #ifndef ODOM_H
 #define ODOM_H
 
-#define TIMERES 20 //time between mesures
+#define TIMERES 118 //time between mesures
 #define CMPSTEP (13.0f/1000.0f) //cm per step
-#define RBTWIDTHCM 5.389f //robot width in cm
+#define RBTWIDTHCM 5.37f //robot width in cm
+#define WHLDIAMCM 7.38
+#define WHLCIRCCM M_PI*WHLDIAMCM
+
+
 
 // library functions
 
@@ -24,5 +28,7 @@ short pgdc(short a,short b);
 float compute_phi(short l, short r);
 
 float compute_dist(short l, short r, float ang);
+
+float compute_rad(short l, short r);
 
 #endif /* ODOM_H */

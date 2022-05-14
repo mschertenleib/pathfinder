@@ -57,29 +57,26 @@ void lauch_odometrie_thd(void){
     right_motor_set_pos(0);
 	chThdCreateStatic(odomThdArea,
 							  sizeof(odomThdArea),
-							  NORMALPRIO,
+							  NORMALPRIO+2,
 							  odometrieThd,
 							  NULL);
 }
 
 void measure_and_add(float* pos, int mlc, int mrc){
 
+
 	float angle_inc =compute_phi(mlc,mrc);
 	pos[2] = fmod((pos[2]+angle_inc),M_TWOPI);
 	float dist_inc = compute_dist(mlc,mrc,pos[2]);
 	pos[0] += dist_inc*cosf(pos[2]);
 	pos[1] += dist_inc*sinf(pos[2]);
-
 	/*
-    short cdiv = pgdc(mlc,mrc);
-    short dl = mlc/cdiv;
-    short dr = mrc/cdiv;
-    float dangle =compute_phi(dl,dr);
-    pos[2] = (pos[2]+dangle)%M_TWOPI;
-    float ddist = compute_dist(dl,dr,pos[2]);
-    pos[0] += ddist*sinf(pos[2]);
-    pos[1] += ddist*cosf(pos[2]);
-    */
+	float angle_inc =compute_phi(mlc,mrc);
+	float rad = compute_rad(mlc,mrc);
+	pos[0] += rad*(1-cos(pos[2]+(angle_inc/2)));
+	pos[1] += rad*(sin(pos[2]+(angle_inc/2)));
+	pos[2] = fmod((pos[2]+angle_inc),M_TWOPI);
+	*/
 }
 
 // internal functions
@@ -100,36 +97,20 @@ float compute_phi(short l, short r){
 	short diff = l - r;
 	return -atan2f((float)diff*CMPSTEP,RBTWIDTHCM);
 
-	/*
-	short op = 0;
-    if(l == r){
-        return 0;
-    }
-    else if (l > r){
-        op = l-r;
-        return atanf( ((float)op*CMPSTEP) / RBTWIDTHCM );
-    }
-    else if (r > l){
-        op = r-l;
-        return -atanf( ((float)op*CMPSTEP) / RBTWIDTHCM );
-    }*/
+    // mathieu's method
+
+	//return (r-l)/(RBTWIDTHCM*(1000/13.0f));
+
 }
 
 float compute_dist(short l, short r, float ang){
-	float ratio = 0;
-	float radius = 0;
-    
     if(l==r) return l*CMPSTEP; // pas super precis
     else{
         return ((l + r)/2.0f)*CMPSTEP;
     }
-    /*
-    else if(l==0 || r==0){
-    	radius = RBTWIDTHCM/2;
-    	return 2*radius*sinf(ang/2);
-    }else{
-    	ratio = ((float)l/(float)r);
-		radius = (ratio + RBTWIDTHCM)/(2*(ratio-1));
-		return 2*radius*sinf(ang/2);
-    }*/
+}
+
+float compute_rad(short l, short r){
+	//mathieu's method
+	return 0.5 * ((l + r) / (r - l)) * RBTWIDTHCM;
 }

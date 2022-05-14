@@ -38,7 +38,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 	if(!running_sequence){
 		set_body_led(0);
 
-		size_move = ReceiveUint16FromComputer(out);
+		size_move = ReceiveUint16FromComputer(in);
 
 		while(1){
 
@@ -58,9 +58,9 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 			move_sequence[(i*3)+2] = (int16_t)((t1 | t2<<8));    // runtime
 
 			i++;
-			if(i > MAX_MOVES-2) {
+			if(i > MAX_MOVES) {
 				chprintf(out,"sequence too long !\r\n");
-				size_move = MAX_MOVES-2;
+				size_move = MAX_MOVES;
 				break;
 			}
 		}
@@ -125,28 +125,32 @@ void sequence_override(void){
 
 void scan(BaseSequentialStream* out){
 	set_body_led(0);
-	float ang;
-	uint16_t dist;
-	int turnspd = (int)(M_PI*RBTWIDTHCM*1000)/(13.0f*secscan);
+	uint16_t dist = 0;
+	float Bang = get_angle();
+	float ang = Bang;
 	size_move = 1;
-	move_sequence[0] = turnspd;
-	move_sequence[1] = -turnspd;
-	move_sequence[2] = secscan*1050;
+	move_sequence[0] = 118;
+	move_sequence[1] = -118;
+	move_sequence[2] = 11100;
 	STOP = FALSE;
 	chBSemSignal(&sequence_ready_sem);
 	SendFloatToComputer(out,get_posx());
 	SendFloatToComputer(out,get_posy());
 	SendFloatToComputer(out,get_angle());
-	while(!running_sequence){
-		chThdSleepMilliseconds(300);
+	while(!running_sequence || ang == Bang){
+		chThdSleepMilliseconds(200);
+		ang = get_angle();
 	}
-	while(running_sequence){
+	while(running_sequence && ang != Bang){
 		ang = get_angle();
 		dist = VL53L0X_get_dist_mm();
 		SendFloatToComputer(out,ang);
 		SendUint16ToComputer(out,dist);
 		chThdSleepMilliseconds(TIMERES);
 	}
+	if(running_sequence) stop();
+	SendUint16ToComputer(out,0xffff);
+	SendUint16ToComputer(out,0xffff);
 	SendUint16ToComputer(out,0xffff);
 }
 
