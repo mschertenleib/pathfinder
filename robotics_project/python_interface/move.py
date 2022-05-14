@@ -134,22 +134,33 @@ class Move:
     def gen_smooth_turn_command(self, steps_per_second, current_robot_angle_rad):
 
         self.command.clear()
+        
+        if len(self.data) < 2:
+            return
 
         # First align with the direction of the first segment
         angle_rad = angle_points((0, 0), (np.cos(current_robot_angle_rad), np.sin(
             current_robot_angle_rad)), self.data[0], self.data[1])
         self.gen_in_place_turn_command(angle_rad, steps_per_second)
+        
+        max_tangent_length_mm = 0
 
-        for i in range(1, len(self.data) - 1):
+        for i in range(1, len(self.data) - 1): # For each corner
             vec_segment_1 = np.subtract(self.data[i], self.data[i - 1])
             vec_segment_2 = np.subtract(self.data[i + 1], self.data[i])
             length_segment_1_mm = norm(vec_segment_1)
             length_segment_2_mm = norm(vec_segment_2)
-            max_tangent_length_mm = min(
-                length_segment_1_mm / 2, length_segment_2_mm / 2)
+            straight_distance_mm = length_segment_1_mm - max_tangent_length_mm
+            max_tangent_length_mm = min(length_segment_1_mm / 2, length_segment_2_mm / 2)
+            straight_distance_mm -= max_tangent_length_mm
             angle_rad = angle_vecs(vec_segment_1, vec_segment_2)
-            turn_radius_mm = max_tangent_length_mm * np.tan(angle_rad / 2)
+            turn_radius_mm = max_tangent_length_mm / np.tan(angle_rad / 2)
+            self.gen_straight_command(straight_distance_mm, steps_per_second)
             self.gen_turn_command(turn_radius_mm, angle_rad, steps_per_second)
+        
+        straight_distance_mm = length_segment_2_mm - max_tangent_length_mm
+        self.gen_straight_command(straight_distance_mm, steps_per_second)
+
 
     def gen_bezier_path(self, steps):
         steps *= (len(self.data) - 1)

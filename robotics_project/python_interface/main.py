@@ -64,12 +64,7 @@ def on_scan_button_clicked(event):
             update_view()
 
 
-def on_bezier_button_clicked(event):
-    print('Generating Bezier command')
-
-    APPROX_PER_LINE = 3
-    current_move.gen_bezier_path(APPROX_PER_LINE)
-    current_move.gen_bez_command(STEPS_PER_SECOND, robot.angle_rad)
+def execute_current_move():
     current_move.gen_file(instruction_file)
 
     robot.trail = []
@@ -88,36 +83,26 @@ def on_stg_button_clicked(event):
     print('Generating Stop-Turn-Go command')
 
     current_move.gen_stg_command(STEPS_PER_SECOND, robot.angle_rad)
-    current_move.gen_file(instruction_file)
 
-    robot.trail = []
+    execute_current_move()
 
-    robot.read_command_file(instruction_file)
-
-    if ser and ser.is_open:
-        comm.move_robot(ser, current_move)
-
-    update_view()
-
-    current_move.reset_data(robot.x_mm, robot.y_mm)
 
 def on_smooth_turn_button_clicked(event):
     print('Generating smooth turn command')
 
     current_move.gen_smooth_turn_command(STEPS_PER_SECOND, robot.angle_rad)
-    
-    current_move.gen_file(instruction_file)
 
-    robot.trail = []
+    execute_current_move()
 
-    robot.read_command_file(instruction_file)
 
-    if ser and ser.is_open:
-        comm.move_robot(ser, current_move)
+def on_bezier_button_clicked(event):
+    print('Generating Bezier command')
 
-    update_view()
+    APPROX_PER_LINE = 3
+    current_move.gen_bezier_path(APPROX_PER_LINE)
+    current_move.gen_bez_command(STEPS_PER_SECOND, robot.angle_rad)
 
-    current_move.reset_data(robot.x_mm, robot.y_mm)
+    execute_current_move()
 
 
 def on_image_button_clicked(event):
@@ -282,7 +267,7 @@ bezier_button = Button(bezier_button_ax, 'Bezier',
 stg_button = Button(stg_button_ax, 'STG',
                     color=button_color, hovercolor=button_hovercolor)
 smooth_turn_button = Button(smooth_turn_button_ax, 'Smooth',
-                    color=button_color, hovercolor=button_hovercolor)
+                            color=button_color, hovercolor=button_hovercolor)
 image_button = Button(image_button_ax, 'Photo',
                       color=button_color, hovercolor=button_hovercolor)
 scan_button = Button(scan_button_ax, 'Scan',
