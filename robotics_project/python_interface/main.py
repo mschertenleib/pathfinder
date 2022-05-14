@@ -31,6 +31,12 @@ def execute_current_move():
 
 ###########################  Events  ################################
 
+
+def on_clear_comm_button_clicked(event):
+    if ser and ser.is_open:
+        ser.reset_input_buffer()
+
+
 def on_beep_button_clicked(event):
     comm.beep(ser, 440)
 
@@ -210,30 +216,34 @@ button_hovercolor = '0.95'
 
 BUTTON_Y = 0.025
 BUTTON_HEIGHT = 0.04
-NUM_BUTTONS = 9
+NUM_BUTTONS = 10
 BUTTON_MARGIN = 0.01
 BUTTON_SPACING = (1 - BUTTON_MARGIN) / NUM_BUTTONS
 BUTTON_WIDTH = BUTTON_SPACING - BUTTON_MARGIN
 
-beep_button_ax = plt.axes(
+clear_comm_button_ax = plt.axes(
     [BUTTON_MARGIN + 0 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-set_button_ax = plt.axes(
+beep_button_ax = plt.axes(
     [BUTTON_MARGIN + 1 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-stop_button_ax = plt.axes(
+set_button_ax = plt.axes(
     [BUTTON_MARGIN + 2 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-scan_button_ax = plt.axes(
+stop_button_ax = plt.axes(
     [BUTTON_MARGIN + 3 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-stg_button_ax = plt.axes(
+scan_button_ax = plt.axes(
     [BUTTON_MARGIN + 4 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-smooth_turn_button_ax = plt.axes(
+stg_button_ax = plt.axes(
     [BUTTON_MARGIN + 5 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-bezier_button_ax = plt.axes(
+smooth_turn_button_ax = plt.axes(
     [BUTTON_MARGIN + 6 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
-image_button_ax = plt.axes(
+bezier_button_ax = plt.axes(
     [BUTTON_MARGIN + 7 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
+image_button_ax = plt.axes(
+    [BUTTON_MARGIN + 8 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT])
 radio_button_ax = plt.axes(
-    [BUTTON_MARGIN + 8 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, 3 * BUTTON_HEIGHT])
+    [BUTTON_MARGIN + 9 * BUTTON_SPACING, BUTTON_Y, BUTTON_WIDTH, 3 * BUTTON_HEIGHT])
 
+clear_comm_button = Button(clear_comm_button_ax, 'Clear comm',
+                           color='#ff9999', hovercolor=button_hovercolor)
 beep_button = Button(beep_button_ax, 'Beep',
                      color=button_color, hovercolor=button_hovercolor)
 set_button = Button(set_button_ax, 'Set', color=button_color,
@@ -255,6 +265,7 @@ LABEL_DIRECT = 'Direct'
 LABEL_SHORTEST = 'Shortest'
 radio_button = RadioButtons(radio_button_ax, (LABEL_DIRECT, LABEL_SHORTEST))
 
+clear_comm_button.on_clicked(on_clear_comm_button_clicked)
 beep_button.on_clicked(on_beep_button_clicked)
 set_button.on_clicked(on_set_button_clicked)
 stop_button.on_clicked(on_stop_button_clicked)

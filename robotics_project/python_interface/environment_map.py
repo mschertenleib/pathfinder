@@ -436,9 +436,9 @@ class Environment_map:
         The image
         """
 
-        map_bgr = cv2.merge([self.as_image()] * 3)
+        map_image = cv2.merge([self.as_image()] * 3)
         walkable_mask = cv2.merge([self.__walkable(walkable_mm)] * 3)
-        return np.where(walkable_mask > 0, np.array(walkable_color).astype(np.uint8), map_bgr)
+        return np.where(walkable_mask > 0, np.array(walkable_color).astype(np.uint8), map_image)
 
     def find_path(self, start_mm, goal_mm, radius_mm):
         """
@@ -690,12 +690,6 @@ class Environment_map:
             self.total_samples, line_to_add.astype(float) / 255)
 
         # Remove the tip of the line before adding to free_samples
-        #line_vector = np.subtract(pt2_index, pt1_index)
-        #delta = line_vector / np.linalg.norm(line_vector) * thickness
-        #line_mask_center = np.add(pt2_index, (int(delta[0]), int(delta[1])))
-        #line_mask_pt1 = np.add(line_mask_center, (line_vector[1], -line_vector[0]))
-        #line_mask_pt2 = np.subtract(line_mask_center, (line_vector[1], -line_vector[0]))
-        #cv2.line(img=line_to_add, pt1=line_mask_pt1, pt2=line_mask_pt2, color=0, thickness=thickness)
         cv2.circle(img=line_to_add, center=pt2_index,
                    radius=thickness, color=0, thickness=-1)
         self.free_samples = cv2.add(

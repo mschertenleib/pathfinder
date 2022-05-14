@@ -121,7 +121,7 @@ class Move:
 
     def draw_path(self, ax, color):
         """
-        Draws the control points of the move set
+        Draws the straight line path connecting the control points of the move set
 
         Parameters
         ---
@@ -149,7 +149,7 @@ class Move:
 
     def gen_straight_command(self, distance_mm, steps_per_second):
         """
-        Generates a straight line command with the given radius
+        Generates a straight line command
 
         Parameters
         ---
@@ -285,7 +285,7 @@ class Move:
         self.commands.clear()
 
         self.remove_adjacent_duplicate_points()
-
+        
         if len(self.points) < 2:
             return
 
@@ -302,12 +302,14 @@ class Move:
             length_segment_1_mm = norm(vec_segment_1)
             length_segment_2_mm = norm(vec_segment_2)
             straight_distance_mm = length_segment_1_mm - max_tangent_length_mm
-            max_tangent_length_mm = min(
-                length_segment_1_mm / 2, length_segment_2_mm / 2)
-            straight_distance_mm -= max_tangent_length_mm
             angle_rad = angle_vecs(vec_segment_1, vec_segment_2)
-            self.gen_straight_command(straight_distance_mm, steps_per_second)
-            if angle_rad != 0:
+            if angle_rad == 0:
+                max_tangent_length_mm = 0
+                self.gen_straight_command(straight_distance_mm, steps_per_second)
+            else:
+                max_tangent_length_mm = min(length_segment_1_mm / 2, length_segment_2_mm / 2)
+                straight_distance_mm -= max_tangent_length_mm
+                self.gen_straight_command(straight_distance_mm, steps_per_second)
                 turn_radius_mm = max_tangent_length_mm / np.tan(angle_rad / 2)
                 self.gen_turn_command(
                     turn_radius_mm, angle_rad, steps_per_second)
@@ -363,6 +365,8 @@ class Move:
 
     def gen_bez_command(self, steps_per_second, current_robot_angle_rad):
         """
+        [EXPERIMENTAL, NOT FULLY WORKING]
+        
         Generates a Bezier command set. The control points are used to generate a Bezier curve
 
         Parameters

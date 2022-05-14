@@ -160,11 +160,7 @@ class EPuck2:
                 turn_radius_mm * np.sin(self.angle_rad)
             turn_center_y_mm = self.y_mm + \
                 turn_radius_mm * np.cos(self.angle_rad)
-            points_per_circle = 100
-            num_points = int(
-                abs(turn_angle_rad / (2 * np.pi) * points_per_circle))
-            if num_points == 0:
-                num_points = 1
+            num_points = 100
             angles_rad = np.linspace(start_angle, end_angle, num_points)
             pxs_mm = turn_center_x_mm + turn_radius_mm * np.sin(angles_rad)
             pys_mm = turn_center_y_mm - turn_radius_mm * np.cos(angles_rad)
