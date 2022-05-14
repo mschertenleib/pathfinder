@@ -2,11 +2,16 @@
 #define MOVE_H
 
 #define MAX_MOVES 100
+#define secscan 6
 // External functions
 
 void ReceiveSpeedInstMove(BaseSequentialStream* in,BaseSequentialStream* out);
 
-void RunSpeedInstSequence(void);
+void stop();
+
+void sequence_override(void);
+
+void scan(BaseSequentialStream* out);
 
 void lauch_move_thd(void);
 

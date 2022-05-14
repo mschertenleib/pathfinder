@@ -112,7 +112,7 @@ class Epuck:
             if not command : 
                 break
 
-            if command[0:4]=="MOVE":
+            if command[0:5]=="!MOVE":
                 size = int(int(f.readline())/3)
                 if size == 1:
                     size = 0
