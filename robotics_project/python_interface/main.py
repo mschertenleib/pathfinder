@@ -117,8 +117,7 @@ def on_image_button_clicked(event):
     print((image_width, image_height, image_buffer))
     image = np.reshape(image_buffer, (image_height, image_width, 3))
 
-    if not image_ax:
-        image_ax = fig.add_subplot(1, 2, 2)
+    image_ax = fig.add_subplot(1, 2, 2)
     image_ax.clear()
     image_ax.set_title('Photo')
     # image_ax.get_xaxis().set_visible(False)
