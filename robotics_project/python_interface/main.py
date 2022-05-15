@@ -51,10 +51,13 @@ def on_set_button_clicked(event):
 
 def on_get_button_clicked(event):
     if ser and ser.is_open:
+        robot.trail.clear()
         robot_data = comm.get_robot_pos(ser)
         if robot_data is not None:
             robot.x_mm, robot.y_mm, robot.angle_rad = robot_data
+        current_move.reset_points(robot.x_mm, robot.y_mm)
         update_view()
+        
 
 
 def on_stop_button_clicked(event):
