@@ -236,6 +236,8 @@ class Move:
                 abs(distance_right_steps / steps_per_second * 1000))
             self.commands.append(
                 (steps_per_second_left, steps_per_second_right, duration_ms))
+        else:
+            self.gen_in_place_turn_command(angle_rad, steps_per_second)
 
     def gen_stg_command(self, steps_per_second, current_robot_angle_rad):
         """

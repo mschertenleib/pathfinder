@@ -77,7 +77,7 @@ class Environment_map:
 
         self.__set_cell(x_mm, y_mm, 0)
 
-    def set_occupied_line(self, pt1_mm, pt2_mm):
+    def set_occupied_line(self, pt1_mm, pt2_mm, thickness=1):
         """
         Generate an occupied line on the map
 
@@ -87,13 +87,15 @@ class Environment_map:
             The first position in mm
         pt2_mm:
             The second position in mm
+        thickness:
+            The thickness of the line, in cells
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
         pt2_index = self.__point_mm_to_index(pt2_mm)
-        cv2.line(self.cells, pt1_index, pt2_index, 0)
+        cv2.line(self.cells, pt1_index, pt2_index, 0, thickness)
 
-    def set_occupied_line_normalized(self, pt1, pt2):
+    def set_occupied_line_normalized(self, pt1, pt2, thickness=1):
         """
         Generate an occupied line on the map
 
@@ -103,11 +105,13 @@ class Environment_map:
             The first position, fraction [0, 1[ of the width of the map
         pt2:
             The second position, fraction [0, 1[ of the height of the map
+        thickness:
+            The thickness of the line, in cells
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
         pt2_index = (int(pt2[0] * self.width_mm), int(pt2[1] * self.height_mm))
-        cv2.line(self.cells, pt1_index, pt2_index, 0)
+        cv2.line(self.cells, pt1_index, pt2_index, 0, thickness)
 
     def set_occupied_rectangle(self, pt1_mm, pt2_mm):
         """
@@ -205,7 +209,7 @@ class Environment_map:
         radius = self.__val_mm_to_index(radius_mm)
         cv2.circle(self.cells, center, radius, 0, -1)
 
-    def set_free_line(self, pt1_mm, pt2_mm):
+    def set_free_line(self, pt1_mm, pt2_mm, thickness=1):
         """
         Generate a free line on the map
 
@@ -215,13 +219,15 @@ class Environment_map:
             The first position in mm
         pt2_mm:
             The second position in mm
+        thickness:
+            The thickness of the line, in cells
         """
 
         pt1_index = self.__point_mm_to_index(pt1_mm)
         pt2_index = self.__point_mm_to_index(pt2_mm)
-        cv2.line(self.cells, pt1_index, pt2_index, 1)
+        cv2.line(self.cells, pt1_index, pt2_index, 1, thickness)
 
-    def set_free_line_normalized(self, pt1, pt2):
+    def set_free_line_normalized(self, pt1, pt2, thickness=1):
         """
         Generate a free line on the map
 
@@ -231,11 +237,13 @@ class Environment_map:
             The first position, fraction [0, 1[ of the width of the map
         pt2:
             The second position, fraction [0, 1[ of the height of the map
+        thickness:
+            The thickness of the line, in cells
         """
 
         pt1_index = (int(pt1[0] * self.width_mm), int(pt1[1] * self.height_mm))
         pt2_index = (int(pt2[0] * self.width_mm), int(pt2[1] * self.height_mm))
-        cv2.line(self.cells, pt1_index, pt2_index, 1)
+        cv2.line(self.cells, pt1_index, pt2_index, 1, thickness)
 
     def set_free_rectangle(self, pt1_mm, pt2_mm):
         """
