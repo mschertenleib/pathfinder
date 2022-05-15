@@ -4,18 +4,7 @@ Gilles Regamey (296642) - Mathieu Schertenleib (313318)
 may 2022
 */
 
-#include "ch.h"
-#include "hal.h"
-#include "leds.h"
-#include <usbcfg.h>
-#include <chprintf.h>
-#include <string.h>
-#include "main.h"
-#include "move.h"
 #include "listen.h"
-#include "odometrie.h"
-#include "process_image.h"
-#include "communications.h"
 
 // Main function, sync communication and picks up commands.
 void listen( BaseSequentialStream* in, BaseSequentialStream* out){
@@ -25,21 +14,11 @@ void listen( BaseSequentialStream* in, BaseSequentialStream* out){
     if(k != '!'){   //ready to take in instruction
         chprintf(out,"ASCII %c, Hex %x, Dec %d.\r\n",k,k,k);
     }else{
-    	instr:
-        /*
-        CLR = Sets position and movement sequence.
-        MOVE = Moves according to speed instruction.
-        POS = Sends current position
-        STOP = Stops
-        PIC = Takes a picture.
-        SCAN = Does a "lidar" turn.
-        BEEP = beeps at a frequency for 100ms
-        */
-
+       instr:
        c1 = (char)chSequentialStreamGet(in);
        c2 = (char)chSequentialStreamGet(in);
        c3 = (char)chSequentialStreamGet(in);
-       if(c1 == '!' || c2 == '!' || c3 == '!') goto instr; //you didnt see it.
+       if(c1 == '!' || c2 == '!' || c3 == '!') goto instr; //you didnt see that.
        char scom[4] = {c1,c2,c3,'\0'};
 
        if(strcmp(scom,"CLR")==0){
@@ -58,7 +37,7 @@ void listen( BaseSequentialStream* in, BaseSequentialStream* out){
            SendFloatToComputer(out,get_angle());
        }else{
            c4 = (char)chSequentialStreamGet(in);
-           if(c4 == '!' ) goto instr; //what ? there's no line 61.
+           if(c4 == '!' ) goto instr; //like in asm.
            char lcom[5] = {c1,c2,c3,c4,'\0'};
 
            if(strcmp(lcom,"MOVE")==0){

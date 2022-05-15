@@ -95,6 +95,7 @@ static THD_FUNCTION(moveThread,arg){
 			chThdSleepMilliseconds(stime);
 		}
 		//stopping after end of sequence.
+		clear_moveinstr();
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
 		//chprintf(BTH,"DONE");
