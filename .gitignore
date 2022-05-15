@@ -1,9 +1,7 @@
-/robotics_project/robotics_project/build
-/robotics_project/robotics_project/.dep
+/lib
 /.idea
 /.vscode
 /venv
 /__pycache__
-/.lauch
-/.txt
+/.launch
 /.out
