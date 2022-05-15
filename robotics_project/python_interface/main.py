@@ -26,6 +26,7 @@ def on_clear_comm_button_clicked(event):
 
 def on_reset_map_button_clicked(event):
     global constructed_map
+    robot.trail.clear()
     constructed_map = envmap.Environment_map(
         width_mm=WIDTH_MM, height_mm=HEIGHT_MM, cell_size_mm=CELL_SIZE_MM)
     update_view()
@@ -58,6 +59,7 @@ def on_get_button_clicked(event):
 
 def on_stop_button_clicked(event):
     comm.stop_robot(ser)
+    robot.trail.clear()
 
 
 def on_scan_button_clicked(event):
