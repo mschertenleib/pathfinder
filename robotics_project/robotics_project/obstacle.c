@@ -1,14 +1,14 @@
 /*
-EPFL MICRO-301 GR59
+EPFL MICRO-315 GR59
 Gilles Regamey (296642) - Mathieu Schertenleib (313318)
-may 2022
+May 2022
 */
 
 #include "obstacle.h"
 
 bool obst_active = TRUE;    // is detection active 
 
-// Obstacle détection thread.
+// Obstacle detection thread.
 static THD_WORKING_AREA(obstacleThreadArea,512);
 static THD_FUNCTION(obstacleThread,arg){
 

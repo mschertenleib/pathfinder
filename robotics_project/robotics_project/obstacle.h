@@ -1,7 +1,7 @@
 /*
-EPFL MICRO-301 GR59
+EPFL MICRO-315 GR59
 Gilles Regamey (296642) - Mathieu Schertenleib (313318)
-may 2022
+May 2022
 */
 
 #ifndef OBSTACLE_H

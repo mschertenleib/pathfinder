@@ -1,7 +1,7 @@
 /*
-EPFL MICRO-301 GR59
+EPFL MICRO-315 GR59
 Gilles Regamey (296642) - Mathieu Schertenleib (313318)
-may 2022
+May 2022
 */
 
 #include "move.h"
@@ -24,8 +24,8 @@ static BSEMAPHORE_DECL(sequence_ready_sem, TRUE);
 */
 void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 {
-    volatile uint8_t l1,l2,r1,r2,t1,t2;
-	volatile uint16_t i=0;
+    uint8_t l1,l2,r1,r2,t1,t2;
+	uint16_t i=0;
 	STOP = FALSE;
 
 	if(!running_sequence){

@@ -48,7 +48,7 @@ int main(void) {
 	serial_start();
 	usb_start();
 
-	//Lauch threads
+	//Launch threads
 	lauch_move_thd();
 	lauch_odometrie_thd();	
 	process_image_start();
