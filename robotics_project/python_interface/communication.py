@@ -96,13 +96,14 @@ def move_robot(ser: serial.Serial, move: move.Move):
 
     num_moves = len(move.commands)
     ser.write(struct.pack('<h', num_moves))
+    
+    NUM_MAX_MOVES = 100
 
-    MAX_MOVES = 100
-
-    for move_command in move.commands:
-        if num_moves > MAX_MOVES:
+    for i in range(num_moves):
+        if i >= NUM_MAX_MOVES:
+            print(f'Too many moves to send ({num_moves}, but maximum is {NUM_MAX_MOVES}')
             break
-        for value in move_command:
+        for value in move.commands[i]:
             ser.write(struct.pack('<h', value))
 
     ser.write('END'.encode('ascii'))

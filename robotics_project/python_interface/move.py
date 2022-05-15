@@ -194,7 +194,7 @@ class Move:
 
     def gen_turn_command(self, radius_mm, angle_rad, steps_per_second):
         """
-        Generates a turn command with the given radius
+        Generates a turn command with the given radius. A positive radius means a turn to the left, a negative radius means a turn to the right
 
         Parameters
         ---
@@ -285,7 +285,7 @@ class Move:
         self.commands.clear()
 
         self.remove_adjacent_duplicate_points()
-        
+
         if len(self.points) < 2:
             return
 
@@ -305,11 +305,14 @@ class Move:
             angle_rad = angle_vecs(vec_segment_1, vec_segment_2)
             if angle_rad == 0:
                 max_tangent_length_mm = 0
-                self.gen_straight_command(straight_distance_mm, steps_per_second)
+                self.gen_straight_command(
+                    straight_distance_mm, steps_per_second)
             else:
-                max_tangent_length_mm = min(length_segment_1_mm / 2, length_segment_2_mm / 2)
+                max_tangent_length_mm = min(
+                    length_segment_1_mm / 2, length_segment_2_mm / 2)
                 straight_distance_mm -= max_tangent_length_mm
-                self.gen_straight_command(straight_distance_mm, steps_per_second)
+                self.gen_straight_command(
+                    straight_distance_mm, steps_per_second)
                 turn_radius_mm = max_tangent_length_mm / np.tan(angle_rad / 2)
                 self.gen_turn_command(
                     turn_radius_mm, angle_rad, steps_per_second)
@@ -338,35 +341,8 @@ class Move:
             t = i / steps
             self.path.append(recursive_bezier(self.points, t))
 
-    def gen_file(self, filename):
+    def gen_bezier_command(self, steps_per_second, current_robot_angle_rad):
         """
-        Generates an instruction file from the command data
-
-        Parameters
-        ---
-        filename:
-            The name of the file to write to
-        """
-
-        f = open(filename, 'w')
-        original_stdout = sys.stdout
-        sys.stdout = f  # Change the standard output to the file we created.
-        print('!MOVE')
-        nb_commands = len(self.commands)
-        print(nb_commands)
-
-        for command in self.commands:
-            cmdline = str(command)[1:len(str(command))-1]
-            lspd, rspd, stime = cmdline.split(', ')
-            print(lspd, rspd, stime)
-
-        print('END %.2f %.2f' % (self.points[-1][0], self.points[-1][1]))
-        sys.stdout = original_stdout  # Reset the standard output to its original value
-
-    def gen_bez_command(self, steps_per_second, current_robot_angle_rad):
-        """
-        [EXPERIMENTAL, NOT FULLY WORKING]
-        
         Generates a Bezier command set. The control points are used to generate a Bezier curve
 
         Parameters
@@ -392,37 +368,46 @@ class Move:
             center = circle_center_from_3_points(
                 self.path[i], self.path[i + 1], self.path[i + 2])
 
-            if center == self.path[i]:  # If goes straight
+            if center == self.path[i]: # If goes straight
                 self.gen_straight_command(
                     dist(self.path[i], self.path[i + 2]), steps_per_second)
 
             else:
-                rad = dist(self.path[i], center)
+                radius = dist(self.path[i], center)
                 angle = 2 * \
-                    np.arcsin((dist(self.path[i], self.path[i+2])) / (2 * rad))
+                    np.arcsin(
+                        dist(self.path[i], self.path[i + 2]) / (2 * radius))
                 # Vector perpendicular to the first two points, pointing to the right
-                Pvect = ((self.path[i + 1][1] - self.path[i][1]
-                          ), -(self.path[i + 1][0] - self.path[i][0]))
+                perpendicular_vec = (
+                    (self.path[i + 1][1] - self.path[i][1]), -(self.path[i + 1][0] - self.path[i][0]))
                 # Vector from point i to center
-                Rvect = (center[0] - self.path[i][0],
-                         center[1] - self.path[i][1])
+                radius_vec = (center[0] - self.path[i][0],
+                              center[1] - self.path[i][1])
+                if np.dot(perpendicular_vec, radius_vec) > 0:  # Center to the right
+                    radius = -radius
+                self.gen_turn_command(radius, angle, steps_per_second)
 
-                if np.dot(Pvect, Rvect) > 0:  # Center to the right
-                    Rtrav_mm = (
-                        rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
-                    Ltrav_mm = (
-                        rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+    def gen_file(self, filename):
+        """
+        Generates an instruction file from the command data
 
-                else:  # Center to the left
-                    Rtrav_mm = (
-                        rad + (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
-                    Ltrav_mm = (
-                        rad - (EPuck2.EPuck2.WHEEL_SPACING_MM / 2)) * angle
+        Parameters
+        ---
+        filename:
+            The name of the file to write to
+        """
 
-                duration_ms = int(30000 / len(self.path)) * 2
-                steps_per_second_left = int(
-                    Ltrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
-                steps_per_second_right = int(
-                    Rtrav_mm / EPuck2.EPuck2.MM_PER_STEP * 1000 / duration_ms)
-                self.commands.append(
-                    (steps_per_second_left, steps_per_second_right, duration_ms))
+        f = open(filename, 'w')
+        original_stdout = sys.stdout
+        sys.stdout = f  # Change the standard output to the file we created.
+        print('!MOVE')
+        nb_commands = len(self.commands)
+        print(nb_commands)
+
+        for command in self.commands:
+            cmdline = str(command)[1:len(str(command))-1]
+            lspd, rspd, stime = cmdline.split(', ')
+            print(lspd, rspd, stime)
+
+        print('END %.2f %.2f' % (self.points[-1][0], self.points[-1][1]))
+        sys.stdout = original_stdout  # Reset the standard output to its original value

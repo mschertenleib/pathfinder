@@ -85,9 +85,9 @@ def on_smooth_turn_button_clicked(event):
 
 
 def on_bezier_button_clicked(event):
-    APPROX_PER_LINE = 3
+    APPROX_PER_LINE = 20
     current_move.gen_bezier_path(APPROX_PER_LINE)
-    current_move.gen_bez_command(STEPS_PER_SECOND, robot.angle_rad)
+    current_move.gen_bezier_command(STEPS_PER_SECOND, robot.angle_rad)
     execute_current_move()
 
 
