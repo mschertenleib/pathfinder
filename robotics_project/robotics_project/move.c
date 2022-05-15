@@ -4,20 +4,6 @@ Gilles Regamey (296642) - Mathieu Schertenleib (313318)
 may 2022
 */
 
-
-
-#include "ch.h"
-#include "hal.h"
-#include "leds.h"
-#include <motors.h>
-#include <usbcfg.h>
-#include <math.h>
-#include <chprintf.h>
-#include <sensors/VL53L0X/VL53L0X.h>
-
-#include "communications.h"
-#include "odometrie.h"
-#include "main.h"
 #include "move.h"
 
 int16_t move_sequence[3*MAX_MOVES] = {'\0'}; //instruction buffer
@@ -54,6 +40,7 @@ void ReceiveSpeedInstMove(BaseSequentialStream* in, BaseSequentialStream* out)
 			r1 = chSequentialStreamGet(in); //get first byte of rightspeed
 			if(l1 == 'E' && l2 == 'N' && r1 == 'D'){
 				i++;
+				size_move = i;
 				break;
 			}
 			r2 = chSequentialStreamGet(in); //get second byte of rightspeed
@@ -90,8 +77,8 @@ static THD_FUNCTION(moveThread,arg){
 
 	while(TRUE){
 		chBSemWait(&sequence_ready_sem);
-		//chThdSleepMilliseconds(500);	?????
 		running_sequence = TRUE;
+		STOP = FALSE;
 		int16_t lspd = 0;
 		int16_t rspd = 0;
 		int16_t stime = 0;
@@ -110,6 +97,7 @@ static THD_FUNCTION(moveThread,arg){
 		//stopping after end of sequence.
 		left_motor_set_speed(0);
 		right_motor_set_speed(0);
+		//chprintf(BTH,"DONE");
 		chThdSleepMilliseconds(100);
 		running_sequence = FALSE;
 		chBSemReset(&sequence_ready_sem,TRUE);
@@ -133,6 +121,7 @@ void sequence_override(void){
 void scan(BaseSequentialStream* out){
 	static bool dirturn = 0; //turns clockwise or counterclockwise
 	stop();
+	obstacle_detection_pause();
 	set_body_led(0);
 	uint16_t dist = 0;
 	float Bang = get_angle();
@@ -172,6 +161,24 @@ void scan(BaseSequentialStream* out){
 	SendUint16ToComputer(out,0xffff);
 	SendUint16ToComputer(out,0xffff);
 	SendUint16ToComputer(out,0xffff);
+	obstacle_detection_continue();
+}
+
+void move_index_set(uint8_t index, int16_t lspd, int16_t rspd, int16_t mtime){
+	move_sequence[index*3] = lspd;
+	move_sequence[index*3 +1] = rspd;
+	move_sequence[index*3 +2] = mtime;
+}
+
+void set_move_lenght(uint16_t lght){
+	size_move = lght;
+    chBSemSignal(&sequence_ready_sem);
+}
+
+void clear_moveinstr(void){
+	for(uint16_t i = 0 ; i < 3*MAX_MOVES ; i++){
+		move_sequence[i] = 0;
+	}
 }
 
 // create move thread.

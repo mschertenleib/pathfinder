@@ -7,16 +7,25 @@ may 2022
 #ifndef OBSTACLE_H
 #define OBSTACLE_H
 
-#define SAMPLE_FILTER 3     // # of measures to confirm stop conditions.
-#define IR_THRESHOLD 350    // limit value for the proximity sensor.
-#define RCTPAD 50           // reaction padding
-#define TIMEBTWM 50        // time between measures in ms.
-#define FLWSPD 100          // follow speed in steps per seconds.
+#include "ch.h"
+#include "hal.h"
+#include <motors.h>
+#include <sensors\proximity.h>
+#include "move.h"
+#include "odometrie.h"
+
+#define TIMEBTWM 50         // time between measures in ms.
+#define IR_THRESHOLD 450    // limit value for the proximity sensor.
+
+enum ir_sensor{front_right,fRight,right,back_right,back_left,left,fLeft,front_left};
 
 // starts thread for obstacle detection.
 void obstacle_detection_init(void);
 
-// speed controller (just kp)
-int spdP(int meas);
+void obstacle_detection_pause(void);
+
+void obstacle_detection_continue(void);
+
+void go_away(uint8_t sensor);
 
 #endif // OBSTACLE_H

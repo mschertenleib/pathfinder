@@ -3,23 +3,10 @@ EPFL MICRO-301 GR59
 Gilles Regamey (296642) - Mathieu Schertenleib (313318)
 may 2022
 */
-#include <obstacle.h>
 
-#include "ch.h"
-#include "hal.h"
-#include "leds.h"
-#include <math.h>
-#include <usbcfg.h>
-#include <chprintf.h>
-#include <main.h>
-#include <motors.h>
-#include <sensors\proximity.h>
+#include "obstacle.h"
 
-#include "move.h"
-#include "odometrie.h"
-
-bool too_close = FALSE;     // condition for stopping the robot.
-bool interrupted = FALSE;   // correcting in process.
+bool obst_active = TRUE;    // is detection active 
 
 // Obstacle détection thread.
 static THD_WORKING_AREA(obstacleThreadArea,512);
@@ -28,65 +15,96 @@ static THD_FUNCTION(obstacleThread,arg){
 	chRegSetThreadName(__FUNCTION__);
 	(void) arg;
 
-    //variables setup. 
-    int front_right,front_left;
-    int back_right,back_left;
-    uint8_t cumulF = 0;
-    uint8_t cumulB = 0;
-
     //main loop.
 	while(TRUE){
-        //gets values from IR sensors.
-        front_right = get_calibrated_prox(0);
-        back_right = get_calibrated_prox(3);
-        back_left = get_calibrated_prox(4);
-        front_left = get_calibrated_prox(7);
-
-        //detects obstacle condition.
-        too_close = FALSE;
-        if(front_right > IR_THRESHOLD-RCTPAD) too_close = TRUE;
-        if(front_left > IR_THRESHOLD-RCTPAD) too_close = TRUE;
-        if(back_right > IR_THRESHOLD-RCTPAD) too_close = TRUE;
-        if(back_right > IR_THRESHOLD-RCTPAD) too_close = TRUE;
-
-        //reacts accordingly.
-        if(too_close){
-            if((back_left + back_right)/2 > IR_THRESHOLD){ //back side.
-                cumulF += 1;
-                if(cumulF >= SAMPLE_FILTER){
-                    interrupted = TRUE;
-                    sequence_override();
-                    left_motor_set_speed(spdP((back_left + back_right)/2));
-                    right_motor_set_speed(spdP((back_left + back_right)/2));
-                    //chThdSleepMilliseconds(100);
-                    }
-            }else{cumulF = 0;} //resets counter if noise.
-
-            if((front_right + front_left)/2 > IR_THRESHOLD){ //front side.
-                cumulB += 1;
-                if(cumulB >= SAMPLE_FILTER){
-                    interrupted = TRUE;
-                    sequence_override();
-                    left_motor_set_speed(-spdP((front_left + front_right)/2));
-                    right_motor_set_speed(-spdP((front_left + front_right)/2));
-                    //chThdSleepMilliseconds(100);
-                }
-            }else{cumulB = 0;} //resets counter if noise.
-
-        // not too close anymore.
-        }else if(interrupted){
-            left_motor_set_speed(0);
-            right_motor_set_speed(0);
-            interrupted = FALSE;
+        //active/inactive obstacle detection.
+		if(!obst_active){
+            chThdSleepMilliseconds(500);
+            continue;
         }
+        //go trough ir sensors values.
+        for(uint8_t ir_index = 0 ; ir_index < 8 ; ir_index++){
+            //if detect a close encounter, gets away from it;
+            if(get_calibrated_prox(ir_index) > IR_THRESHOLD) go_away(ir_index);
+        }
+
         chThdSleepMilliseconds(TIMEBTWM);
     }
 }
 
-// simple speed controller
-int spdP(int meas){
-    int err = (IR_THRESHOLD - meas);
-    return -(err);
+// simple mapping for speed control
+// val going from amin to amax mapped to bmin to bmax.
+void spd_control(int measL, int measR, float w){
+    int common = (measL + measR)/2;
+    int err = common - IR_THRESHOLD;
+    int diff = (measL - measR)/4;
+    left_motor_set_speed((int)(w*(err + diff)));
+    right_motor_set_speed((int)(w*(err - diff)));
+}
+
+//pause the obstacle detection.
+void obstacle_detection_pause(void){
+	obst_active = 0;
+}
+
+//re activate obstacle detection.
+void obstacle_detection_continue(void){
+	obst_active = 1;
+}
+
+void go_away(uint8_t sensor){
+    stop();
+    switch (sensor)
+    {
+    case front_right:
+        move_index_set(0,-308,-308,500);
+        set_move_lenght(1);
+        chThdSleepMilliseconds(510);
+        break;
+    case fRight:
+        move_index_set(0,236,-236,694);
+        move_index_set(1,-308,-308,500);
+        set_move_lenght(2);
+        chThdSleepMilliseconds(1200);
+        break;
+    case right:
+        move_index_set(0,236,-236,1387);
+        move_index_set(1,-308,-308,500);
+        set_move_lenght(2);
+        chThdSleepMilliseconds(1900);
+        break;
+    case back_right:
+        move_index_set(0,-236,236,650);
+        move_index_set(1,308,308,500);
+        set_move_lenght(2);
+        chThdSleepMilliseconds(1200);
+        break;
+    case back_left:
+        move_index_set(0,236,-236,650);
+        move_index_set(1,308,308,500);
+        set_move_lenght(2);
+        chThdSleepMilliseconds(1200);
+        break;
+    case left:
+        move_index_set(0,-236,236,1387);
+        move_index_set(1,-308,-308,500);
+        set_move_lenght(2);
+        chThdSleepMilliseconds(1900);
+        break;
+    case fLeft:
+        move_index_set(0,-236,236,694);
+        move_index_set(1,-308,-308,500);
+        set_move_lenght(2);
+        chThdSleepMilliseconds(1200);
+        break;
+    case front_left:
+        move_index_set(0,-308,-308,500);
+        set_move_lenght(1);
+        chThdSleepMilliseconds(510);
+        break;
+    default:
+        break;
+    }
 }
 
 // starts detection thread.
