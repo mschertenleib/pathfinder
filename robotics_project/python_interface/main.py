@@ -48,22 +48,29 @@ def on_set_button_clicked(event):
     update_view()
 
 
+def on_get_button_clicked(event):
+    if ser and ser.is_open:
+        robot_data = comm.get_robot_pos(ser)
+        if robot_data is not None:
+            robot.x_mm, robot.y_mm, robot.angle_rad = robot_data
+        update_view()
+
+
 def on_stop_button_clicked(event):
     comm.stop_robot(ser)
 
 
 def on_scan_button_clicked(event):
+    robot.trail.clear()
     if ser and ser.is_open:
         res = comm.request_scan(ser)
         if res is None:
             return
         (robot.x_mm, robot.y_mm, robot.angle_rad) = res
-        print(robot.x_mm, robot.y_mm, robot.angle_rad)
 
         scan_generator = comm.scan_generator(ser)
 
         for robot.angle_rad, distance_mm in scan_generator:
-            print(robot.angle_rad, distance_mm)
             constructed_map.construct((robot.x_mm, robot.y_mm), robot.angle_rad, EPuck2.EPuck2.RADIUS_MM,
                                       distance_mm, EPuck2.EPuck2.TOF_SENSOR_OFFSET_MM, EPuck2.EPuck2.TOF_MAX_DISTANCE_MM, LINE_THICKNESS)
             update_view()
@@ -114,7 +121,6 @@ def on_image_button_clicked(event):
     if not image_data:
         return
     (image_width, image_height, image_buffer) = image_data
-    print((image_width, image_height, image_buffer))
     image = np.reshape(image_buffer, (image_height, image_width, 3))
 
     image_ax = fig.add_subplot(1, 2, 2)
@@ -293,10 +299,10 @@ plt.subplots_adjust(bottom=0.3)
 button_color = 'lightgoldenrodyellow'
 button_hovercolor = '0.95'
 
-BUTTON_WIDTH = 0.1
-LARGE_BUTTON_WIDTH = 0.16
+BUTTON_WIDTH = 0.09
+LARGE_BUTTON_WIDTH = 0.15
 BUTTON_HEIGHT = 0.04
-BUTTON_MARGIN = 0.02
+BUTTON_MARGIN = 0.01
 RADIO_BUTTON_WIDTH = 0.3
 RADIO_BUTTON_HEIGHT = 0.2
 
@@ -312,12 +318,14 @@ beep_button_ax = plt.axes(
     [SMALL_BUTTON_START_X, BUTTON_Y_HIGH, BUTTON_WIDTH, BUTTON_HEIGHT])
 set_button_ax = plt.axes(
     [SMALL_BUTTON_START_X + BUTTON_SPACING, BUTTON_Y_HIGH, BUTTON_WIDTH, BUTTON_HEIGHT])
-stop_button_ax = plt.axes(
+get_button_ax = plt.axes(
     [SMALL_BUTTON_START_X + 2 * BUTTON_SPACING, BUTTON_Y_HIGH, BUTTON_WIDTH, BUTTON_HEIGHT])
-scan_button_ax = plt.axes(
+stop_button_ax = plt.axes(
     [SMALL_BUTTON_START_X + 3 * BUTTON_SPACING, BUTTON_Y_HIGH, BUTTON_WIDTH, BUTTON_HEIGHT])
-cancel_button_ax = plt.axes(
+scan_button_ax = plt.axes(
     [SMALL_BUTTON_START_X + 4 * BUTTON_SPACING, BUTTON_Y_HIGH, BUTTON_WIDTH, BUTTON_HEIGHT])
+cancel_button_ax = plt.axes(
+    [SMALL_BUTTON_START_X + 4 * BUTTON_SPACING, BUTTON_MARGIN, BUTTON_WIDTH, BUTTON_HEIGHT])
 stg_button_ax = plt.axes(
     [SMALL_BUTTON_START_X, BUTTON_MARGIN, BUTTON_WIDTH, BUTTON_HEIGHT])
 smooth_turn_button_ax = plt.axes(
@@ -327,7 +335,7 @@ bezier_button_ax = plt.axes(
 image_button_ax = plt.axes(
     [SMALL_BUTTON_START_X + 3 * BUTTON_SPACING, BUTTON_MARGIN, BUTTON_WIDTH, BUTTON_HEIGHT])
 action_radio_button_ax = plt.axes(
-    [SMALL_BUTTON_START_X + 4 * BUTTON_SPACING, BUTTON_MARGIN, RADIO_BUTTON_WIDTH, RADIO_BUTTON_HEIGHT])
+    [SMALL_BUTTON_START_X + 5 * BUTTON_SPACING, BUTTON_MARGIN, RADIO_BUTTON_WIDTH, RADIO_BUTTON_HEIGHT])
 
 clear_comm_button = Button(clear_comm_button_ax, 'Clear comm',
                            color='#ff9999', hovercolor=button_hovercolor)
@@ -336,6 +344,8 @@ reset_map_button = Button(reset_map_button_ax, 'Reset map',
 beep_button = Button(beep_button_ax, 'Beep',
                      color=button_color, hovercolor=button_hovercolor)
 set_button = Button(set_button_ax, 'Set', color=button_color,
+                    hovercolor=button_hovercolor)
+get_button = Button(get_button_ax, 'Get', color=button_color,
                     hovercolor=button_hovercolor)
 stop_button = Button(stop_button_ax, 'Stop',
                      color=button_color, hovercolor=button_hovercolor)
@@ -368,6 +378,7 @@ clear_comm_button.on_clicked(on_clear_comm_button_clicked)
 reset_map_button.on_clicked(on_reset_map_button_clicked)
 beep_button.on_clicked(on_beep_button_clicked)
 set_button.on_clicked(on_set_button_clicked)
+get_button.on_clicked(on_get_button_clicked)
 stop_button.on_clicked(on_stop_button_clicked)
 scan_button.on_clicked(on_scan_button_clicked)
 cancel_button.on_clicked(on_cancel_button_clicked)

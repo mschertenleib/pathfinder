@@ -22,17 +22,17 @@ List of commands:
 def open_port(port: str):
     """
     Open the specified port
-    
+
     Parameters
     ---
     port:
         The port name
-    
+
     Returns
     ---
     A serial.Serial object in open state on success and closed state on error
     """
-    
+
     try:
         ser = serial.Serial(port, 57600, timeout=5)
         print(f'Opened port {port}')
@@ -45,7 +45,7 @@ def open_port(port: str):
 def beep(ser: serial.Serial, frequency_Hz: int):
     """
     Emit a sound at the given frequency
-    
+
     Parameters
     ---
     ser:
@@ -53,7 +53,7 @@ def beep(ser: serial.Serial, frequency_Hz: int):
     frequency_Hz:
         The frequency to play in Hertz
     """
-    
+
     ser.write('!BEEP'.encode('ascii'))
     ser.write(struct.pack('<h', frequency_Hz))
 
@@ -61,7 +61,7 @@ def beep(ser: serial.Serial, frequency_Hz: int):
 def clear_and_set(ser: serial.Serial, x_mm, y_mm, angle_rad):
     """
     Clear the movement buffer on the robot and set its position
-    
+
     Parameters
     ---
     ser:
@@ -73,7 +73,7 @@ def clear_and_set(ser: serial.Serial, x_mm, y_mm, angle_rad):
     angle_rad:
         The angle of the robot in radians
     """
-    
+
     ser.write('!CLR'.encode('ascii'))
     ser.write(struct.pack('<f', x_mm / 10))
     ser.write(struct.pack('<f', y_mm / 10))
@@ -83,7 +83,7 @@ def clear_and_set(ser: serial.Serial, x_mm, y_mm, angle_rad):
 def move_robot(ser: serial.Serial, move: move.Move):
     """
     Send a move set to the robot
-    
+
     Parameters
     ---
     ser:
@@ -91,17 +91,18 @@ def move_robot(ser: serial.Serial, move: move.Move):
     move:
         A move.Move object representing the moves to send
     """
-    
+
     ser.write('!MOVE'.encode('ascii'))
 
     num_moves = len(move.commands)
-    ser.write(struct.pack('<h', num_moves))
-    
+    ser.write(struct.pack('<H', num_moves))
+
     NUM_MAX_MOVES = 100
 
     for i in range(num_moves):
         if i >= NUM_MAX_MOVES:
-            print(f'Too many moves to send ({num_moves}, but maximum is {NUM_MAX_MOVES}')
+            print(
+                f'Too many moves to send ({num_moves}, but maximum is {NUM_MAX_MOVES}')
             break
         for value in move.commands[i]:
             ser.write(struct.pack('<h', value))
@@ -114,17 +115,17 @@ def move_robot(ser: serial.Serial, move: move.Move):
 def acquire_image(ser: serial.Serial):
     """
     Acquire a color image from the robot
-    
+
     Parameters
     ---
     ser:
         A serial.Serial object to use
-    
+
     Returns
     ---
     A tuple of (width, height, pixels) on success, or None on error
     """
-    
+
     # Send command
     ser.write('!PIC'.encode('ascii'))
 
@@ -157,17 +158,17 @@ def acquire_image(ser: serial.Serial):
 def get_robot_pos(ser: serial.Serial):
     """
     Query the robot position
-    
+
     Parameters
     ---
     ser:
         A serial.Serial object to use
-    
+
     Returns
     ---
     A tuple of (robot_x_mm, robot_y_mm, robot_angle_rad), or None on error
     """
-    
+
     # Send command
     ser.write('!POS'.encode('ascii'))
 
@@ -176,7 +177,7 @@ def get_robot_pos(ser: serial.Serial):
     if len(data_bytes) != 12:
         print(f'Read only {len(data_bytes)} out of 12 in get_robot_pos')
         return
-    
+
     robot_x_mm = struct.unpack('<f', data_bytes[0:4])[0] * 10
     robot_y_mm = struct.unpack('<f', data_bytes[4:8])[0] * 10
     robot_angle_rad = struct.unpack('<f', data_bytes[8:12])[0]
@@ -186,17 +187,17 @@ def get_robot_pos(ser: serial.Serial):
 def request_scan(ser: serial.Serial):
     """
     Gets the robot position and starts a scan
-    
+
     Parameters
     ---
     ser:
         A serial.Serial object to use
-    
+
     Returns
     ---
     A tuple of (robot_x_mm, robot_y_mm, robot_angle_rad), or None on error
     """
-    
+
     ser.write('!SCAN'.encode('ascii'))
 
     data_bytes = ser.read(12)
@@ -213,12 +214,12 @@ def request_scan(ser: serial.Serial):
 def scan_generator(ser: serial.Serial):
     """
     Generator function returning scan values sequentially. A prior call to request_scan must have been done
-    
+
     Parameters
     ---
     ser:
         A serial.Serial object to use
-    
+
     Returns
     ---
     Yields a tuple of (angle_rad, distance_mm), returns None on error
@@ -228,12 +229,16 @@ def scan_generator(ser: serial.Serial):
         data_bytes = ser.read(6)
 
         if len(data_bytes) != 6:
-            print(f'Read only {len(data_bytes)} out of 6 in get_next_scan')
+            print(f'Read only {len(data_bytes)} out of 6 in scan_generator')
             return
 
         # Stop condition
-        if data_bytes == bytes([0xff] * 6):
-            return
+        try:
+            done_string = data_bytes[0:4].decode('ascii')
+            if done_string.find('DONE') != -1:
+                return
+        except:
+            pass
 
         angle_rad = struct.unpack('<f', data_bytes[0:4])[0]
         distance_mm = struct.unpack('<H', data_bytes[4:6])[0]
@@ -243,20 +248,20 @@ def scan_generator(ser: serial.Serial):
 def stop_robot(ser: serial.Serial):
     """
     Stops the robot and clears its movement buffer
-    
+
     Parameters
     ---
     ser:
         A serial.Serial object to use
     """
-    
+
     ser.write('!STOP'.encode('ascii'))
 
 
 def send_instruction_file(ser: serial.Serial, filename: str):
     """
     Sends and instruction file to the robot
-    
+
     Parameters
     ---
     ser:
@@ -301,7 +306,7 @@ def rgb565_to_rgb888(rgb565):
     """
     Converts rgb565 data to a tuple of red, green and blue uint8
     """
-    
+
     r5 = (rgb565 & 0b1111_1000_0000_0000) >> 11
     g6 = (rgb565 & 0b0000_0111_1110_0000) >> 5
     b5 = (rgb565 & 0b0000_0000_0001_1111) >> 0
