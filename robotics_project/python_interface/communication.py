@@ -231,14 +231,10 @@ def scan_generator(ser: serial.Serial):
         if len(data_bytes) != 6:
             print(f'Read only {len(data_bytes)} out of 6 in scan_generator')
             return
-
+        
         # Stop condition
-        try:
-            done_string = data_bytes[0:4].decode('ascii')
-            if done_string.find('DONE') != -1:
-                return
-        except:
-            pass
+        if data_bytes == bytes([0xff] * 6):
+            return
 
         angle_rad = struct.unpack('<f', data_bytes[0:4])[0]
         distance_mm = struct.unpack('<H', data_bytes[4:6])[0]

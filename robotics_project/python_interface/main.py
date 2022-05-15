@@ -26,6 +26,7 @@ def on_clear_comm_button_clicked(event):
 
 def on_reset_map_button_clicked(event):
     global constructed_map
+    robot.trail.clear()
     constructed_map = envmap.Environment_map(
         width_mm=WIDTH_MM, height_mm=HEIGHT_MM, cell_size_mm=CELL_SIZE_MM)
     update_view()
@@ -50,14 +51,18 @@ def on_set_button_clicked(event):
 
 def on_get_button_clicked(event):
     if ser and ser.is_open:
+        robot.trail.clear()
         robot_data = comm.get_robot_pos(ser)
         if robot_data is not None:
             robot.x_mm, robot.y_mm, robot.angle_rad = robot_data
+        current_move.reset_points(robot.x_mm, robot.y_mm)
         update_view()
+        
 
 
 def on_stop_button_clicked(event):
     comm.stop_robot(ser)
+    robot.trail.clear()
 
 
 def on_scan_button_clicked(event):
@@ -276,7 +281,7 @@ HEIGHT_PX = HEIGHT_MM
 
 LINE_THICKNESS = 1
 
-WALKABLE_MIN_RADIUS = EPuck2.EPuck2.RADIUS_MM * 2
+WALKABLE_MIN_RADIUS = EPuck2.EPuck2.RADIUS_MM * 2.5
 
 STEPS_PER_SECOND = 400
 

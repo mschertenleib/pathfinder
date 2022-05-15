@@ -27,7 +27,7 @@ class EPuck2:
     MAX_STEPS_PER_SECOND = 1000
     CAM_FOV_RAD = np.pi / 4
     TOF_SENSOR_OFFSET_MM = RADIUS_MM - 1.8
-    TOF_MAX_DISTANCE_MM = 1000
+    TOF_MAX_DISTANCE_MM = 400
 
     def __init__(self, x_mm=0, y_mm=0, angle_rad=0):
         self.x_mm = x_mm
