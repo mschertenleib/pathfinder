@@ -3,7 +3,9 @@
 The 2022 Embedded Systems and Robotics project of Gilles Regamey and Mathieu
 Schertenleib
 
-Video link: https://www.youtube.com/watch?v=VZcvgjDBHKk
+[The video](https://www.youtube.com/watch?v=VZcvgjDBHKk)
+
+[The full report](pathfinder_report.pdf) (in French) 
 
 ---
 
